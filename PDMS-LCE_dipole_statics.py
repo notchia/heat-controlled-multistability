@@ -294,7 +294,7 @@ def find_phase_boundaries(T_range, h_range, ratio_range, thetaL_range,
                         vals[count] = val_temp
                         count += 1
             if max_diff == 0:
-                boundaryVals[pt] = np.nan#-1
+                boundaryVals[pt] = np.nan
             elif (0 in vals) and (1 in vals):
                 boundaryVals[pt] = 0
             elif (0 in vals) and (1 not in vals):
@@ -311,82 +311,22 @@ def find_phase_boundaries(T_range, h_range, ratio_range, thetaL_range,
                 boundaryVals[pt] = 5
 
     # Join and sort boundary information by value
+    boundaryT = np.array([T_range[i] for i in boundaries[:,0]]).reshape((-1,1))
+    boundaryh = np.array([1000*h_range[i] for i in boundaries[:,1]]).reshape((-1,1))
+    boundarytheta = np.array([np.degrees(thetaL_range[i]) for i in boundaries[:,2]]).reshape((-1,1))
+    print(max(T_range))
+    print(max(boundaryT[:,0]))
+    print(max(1000*h_range))
+    print(max(boundaryh[:,0]))
+    print(max(np.degrees(thetaL_range)))
+    print(max(boundarytheta[:,0]))
+    #print(boundarytheta[0])
     boundaryVals = boundaryVals.reshape((-1,1))
-    boundaryData = np.concatenate((boundaries, boundaryVals), axis=1)
+    boundaryData = np.concatenate((boundaryT, boundaryh, boundarytheta, boundaryVals), axis=1)
     boundaryData = boundaryData[boundaryData[:,-1].argsort(kind='mergesort')]
 
     return boundaries, boundaryVals, boundaryData
     
-
-''' Plot 3D phase diagram for given ratio index'''
-def plot_phase_boundaries(boundaries, boundaryVals,
-                          T_range, h_range, ir, thetaL_range,
-                          minima, phases, angleT_vals, angle0_vals,
-                          T_plane=0):
-    if T_plane:
-        iT = np.argwhere(T_range > T_plane)[0][0]
-    colors = ['xkcd:light red', 'xkcd:red', 'xkcd:apple green', 'xkcd:dark lime green', 'xkcd:dark lime green', 'xkcd:electric blue','xkcd:electric blue']
-    colors3 = ['xkcd:light red', 'xkcd:apple green', 'xkcd:electric blue']
-    customcm = col.ListedColormap(colors3[::-1])
-      
-    fig = plt.figure()
-    ax = fig.gca(projection='3d')
-    ax.view_init(azim=-105)
-    x = 1000*h_range
-    y = np.degrees(thetaL_range)
-    z = T_range
-    X, Y = np.meshgrid(x, y)
-
-    x_below = np.full_like(boundaryVals, np.nan)
-    x_above = np.full_like(boundaryVals, np.nan)
-    y_below = np.full_like(boundaryVals, np.nan)
-    y_above = np.full_like(boundaryVals, np.nan)
-    z_below = np.full_like(boundaryVals, np.nan)
-    z_above = np.full_like(boundaryVals, np.nan)
-    nPoints = max(boundaries.shape)
-    for pt in range(nPoints):
-        loc = [boundaries[pt,0], boundaries[pt,1], boundaries[pt,2]]
-        if loc[0] <= iT:
-            x_below[pt] = x[loc[1]] 
-            y_below[pt] = y[loc[2]] 
-            z_below[pt] = z[loc[0]] 
-        else:
-            x_above[pt] = x[loc[1]] 
-            y_above[pt] = y[loc[2]] 
-            z_above[pt] = z[loc[0]]             
-
-    iL = np.argwhere(thetaL_range > 0)[0][0]
-
-    x_rb = np.full_like(boundaryVals, np.nan)
-    x_rt = np.full_like(boundaryVals, np.nan)
-    y_rb = np.full_like(boundaryVals, np.nan)
-    y_rt = np.full_like(boundaryVals, np.nan)
-    z_rb = np.full_like(boundaryVals, np.nan)
-    z_rt = np.full_like(boundaryVals, np.nan)
-    for pt in range(nPoints):
-        loc = [boundaries[pt,0], boundaries[pt,1], boundaries[pt,2]]
-        if loc[2] >= iL:
-            if loc[0] <= iT:
-                x_rb[pt] = x[loc[1]] 
-                y_rb[pt] = y[loc[2]] 
-                z_rb[pt] = z[loc[0]] 
-            else:
-                x_rt[pt] = x[loc[1]] 
-                y_rt[pt] = y[loc[2]] 
-                z_rt[pt] = z[loc[0]]  
-                
-    diagram = ax.scatter(x_below, y_below, z_below, c=boundaryVals, 
-                         marker='.', cmap=col.ListedColormap(colors), zorder=1)        
-    if T_plane:
-        ax.plot_surface(X, Y, np.full_like(Y, T_range[iT]), rstride=1, cstride=1, facecolors=customcm(np.transpose((minima[iT,:,ir,:])-1)/3), alpha=0.075, zorder=2)
-#        diagram = ax.scatter(x_above, y_above, z_above, marker='.', c=boundaryVals, cmap=col.ListedColormap(colors), zorder=3)
-    diagram = ax.scatter(x_rt, y_rt, z_rt, marker='.', c=boundaryVals, cmap=col.ListedColormap(colors), zorder=3)        
-
-    ax.set_xlabel(r'$h$ (mm)', fontsize=14)
-    ax.set_ylabel(r'$\theta_L$ (deg)', fontsize=14, rotation=150)
-    ax.set_zlabel(r'$T$ ($^{\circ}$C)', fontsize=14, rotation=60)
-    bar = fig.colorbar(diagram, aspect=10)
-
 
 ''' Plot isotherm phase diagram for each composite: h vs total equilibrium angle'''
 def plot_isotherms(T_range, h_range, ratio_range, thetaL_range, minima, phases, angleT_vals, angle0_vals, T_plane=False):
@@ -451,12 +391,16 @@ def analyze_parameter_energy(h_total, ratio, T, thetaL):
    
     
 ''' Export general 2D data array to csv file. fmt can be list '''
-def export_to_csv(filename, data, headerList=[], fmt='%0.18e'):
-    nCol = data.shape[1]
-    if headerList == []:
-        headerList = ['col{0}'.format(i) for i in range(nCol)]
-    header = ", ".join(map(str, headerList))
-    np.savetxt(filename, data, delimiter=', ', fmt=fmt, header=header)
+def export_to_csv(filename, data, variables=[], units=[], fmt='%0.18e'):
+    if variables != [] and units != []:
+        headerVars = ", ".join(map(str, variables))
+        headerUnits = ", ".join(map(str, units))
+    else: 
+        headerVars = ''
+        headerUnits = ''
+    headerStr = headerVars + '\n' + headerUnits
+    
+    np.savetxt(filename, data, delimiter=', ', fmt=fmt, header=headerStr)
     return filename
 
     
@@ -590,9 +534,13 @@ if __name__ == "__main__":
         print("\tFinding phase boundaries...")
         boundaries, boundaryVals, boundaryData = find_phase_boundaries(T_range, h_range, r_range, thetaL_range,
                                                          minima, phases, thetaT, theta0)
-        print("\tSaving diffs, boundaries, and boundaryVals...")        
-        export_to_csv(boundaries_file, boundaries, fmt='%d', headerList=["T index", "h index", "thetaL index"])
-        export_to_csv(boundaryData_file, boundaryData, fmt=['%d','%d','%d','%0.1f'], headerList=["T index", "h index", "thetaL index", "value"])
+        print("\tSaving diffs, boundaries, and boundaryVals...")
+        export_to_csv(boundaries_file, boundaries, fmt='%d',
+                      variables=["T index", "h index", "thetaL index"],
+                      units=["index","index","index"])
+        export_to_csv(boundaryData_file, boundaryData, fmt=['%0.1f','%0.4f','%0.2f','%0.1f'],
+                      variables=["T", "h", "thetaL", "value"],
+                      units=["degrees C","mm","degrees","id number"])
         np.savetxt(boundaryVals_file, boundaryVals, delimiter=', ', fmt='%0.1f', header='Boundary values')
         
         # Export a file for each surface, except for points labeled nan
@@ -601,17 +549,20 @@ if __name__ == "__main__":
         for surface in boundarySurfaces:
             value = surface[0,-1]
             if not np.isnan(value):
-                value = int(value)
-                export_to_csv(os.path.join(cwd, '{0}_boundaryData_{1}.csv'.format(datestr,value)), surface[:,0:-1], fmt='%d', headerList=["T index", "h index", "thetaL index"])
-                csv2vtk(os.path.join(cwd, '{0}_boundaryData_{1}.csv'.format(datestr,value)))
+                fname = os.path.join(cwd, '{0}_boundaryData_{1}.csv'.format(datestr,int(value)))
+                export_to_csv(fname, surface[:,0:-1], fmt=['%0.1f','%0.4f','%0.2f'],
+                              variables=["T", "h", "thetaL"],
+                              units=["degrees C","mm","degrees"]
+                              )
+                csv2vtk(fname)
             else:
                 nanCounter += 1
         print("nan count: {0}".format(nanCounter))
 
-    plot_phase_boundaries(boundaries, boundaryVals,
-                          T_range, h_range, 0, thetaL_range,
-                          minima, phases, thetaT, theta0,
-                          T_plane=T_plane)
+    #plot_phase_boundaries(boundaries, boundaryVals,
+    #                      T_range, h_range, 0, thetaL_range,
+    #                      minima, phases, thetaT, theta0,
+    #                      T_plane=T_plane)
     
     #plot_isotherms(T_range, h_range, r_range, thetaL_range, minima, phases, thetaT, theta0, T_plane)
     
