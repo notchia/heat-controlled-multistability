@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Render Paraview 3D phase diagram: render surface(s)
+Render Paraview 3D phase diagram: render surface(s).
 
-@author: Lucia
+To do: add isotherm plotting, change opacity, clip a corner
+
+@author: Lucia Korpas
 """
 
 import os
@@ -11,10 +13,12 @@ pv._DisableFirstRenderCameraReset()
 
 
 def render_surface(fname):
+    ''' Render a single surface, defined in the file fname '''
+    
     fontSize = 16
     textColor = [0,0,0] #black
     
-    axisLabels = [r'$h$ (mm)', r'$\theta_L$ ($^{\circ}$)', r'$T$ ($^{\circ}$C)']
+    axisLabels = ['h (mm)', 'theta_L (deg)', 'T (C)']#['$h$ (mm)', '$\theta_L$ ($^{\circ}$)', '$T$ ($^{\circ}$C)']
     axisLocations = [(0.65, 0.05), (0.15, 0.1), (0.0, 0.5)] # (x,y) from bottom left
 
     gridScale = [45, 2, 1]
@@ -23,7 +27,7 @@ def render_surface(fname):
     # Import VTK file and initialize render view
     boundaryVTK = pv.LegacyVTKReader(FileNames=[fname])
     renderView = pv.GetActiveViewOrCreate('RenderView')
-
+    renderView.Background = [1,1,1]  #white
     
     boundaryVTKDisplay = pv.Show(boundaryVTK, renderView)
     boundaryVTKDisplay.Representation = 'Surface'
@@ -106,9 +110,9 @@ def render_surface(fname):
     loopSubdivision1Display.Scale = gridScale
     
     #renderView.AxesGrid.AxesToLabel = 3
-    renderView.AxesGrid.XTitle = ''#axisLabels[0]
-    renderView.AxesGrid.YTitle = ''#axisLabels[1]
-    renderView.AxesGrid.ZTitle = ''#axisLabels[2]
+    renderView.AxesGrid.XTitle = axisLabels[0]
+    renderView.AxesGrid.YTitle = axisLabels[1]
+    renderView.AxesGrid.ZTitle = axisLabels[2]
     renderView.AxesGrid.XTitleFontSize = 2*fontSize
     renderView.AxesGrid.YTitleFontSize = 2*fontSize
     renderView.AxesGrid.ZTitleFontSize = 2*fontSize
@@ -125,7 +129,7 @@ def render_surface(fname):
     renderView.AxesGrid.DataScale = gridScale
 
     renderView.Update() 
-    
+    '''
     # Display and format labels
     text1 = pv.Text()
     text1.Text = axisLabels[0]
@@ -150,7 +154,7 @@ def render_surface(fname):
     text3Display.WindowLocation = 'AnyLocation'
     text3Display.Position = axisLocations[2]
     text3Display.FontSize = fontSize
-    
+    '''
     # current camera placement for renderView
     renderView.CameraPosition = [-28.6, -29.2, 37.4]
     renderView.CameraFocalPoint = [-0.97, 4.88, 11.31]
@@ -163,14 +167,16 @@ def render_surface(fname):
 
     
 def render_surfaces(fnameList):
+    ''' Render a series of surfaces on the same axes '''
+    
     for fname in fnameList:
         render_surface(fname)
         
-    pv.Render()
-    
-'''To do: add isotherm'''
+    #pv.Render()
+    pv.Interact()
+
 #def render_isotherm(fname):
-    
+    ''' Render an isotherm at the location defined in the filename '''
 
 #--------------------------------------------------------------------------
 
@@ -183,6 +189,7 @@ if __name__ == "__main__":
         fname = os.path.join(basepath, '20200422_boundaryData_{0}.vtk'.format(value))
         fnameList.append(fname)
     render_surfaces(fnameList)
+    #pv.WriteImage("test.png")
     pv.SaveScreenshot(os.path.join(basepath,'paraview.png'),pv.GetActiveView(),
                       TransparentBackground=1)
     

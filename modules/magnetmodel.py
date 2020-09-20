@@ -1,82 +1,133 @@
 # -*- coding: utf-8 -*-
 """
-Created on Fri Jun 19 11:27:45 2020
-
-@author: Lucia
+Fit experimental data for magnet strenth. From main data analysis script, call
+the following function:
+    plist, fcn = fit_magnet_force(fullpath)
+with
+    fullpath:   str corresponding to raw data file location
+    plist:      list of fitting parameters
+    fcn:        function for which fitting parameters were found 
+    
+@author: Lucia Korpas
 """
 
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.optimize import curve_fit
+import scipy.optimize as opt
+import os
+import re
+import math
 
-import pltformat  # module: no funcions, just standardized plot formatting
+from modules import tensiletest
 
-''' Magnetic force model to get magnetic moment '''
 def model_force (d, m):
-    mu0 = 1.256637*10**(-6)
-    return (3*mu0*m**2)/(2*np.pi*d**4)
+    ''' Model force at a given distance between two identical attracting
+        magnets, assuming them to be point dipoles, given the magnetic moment '''
+    
+    mu0 = 1.256637*10**(-6) # magnetic permeability of free space
+    F = (3*mu0*m**2)/(2*np.pi*d**4)
+    return F
 
 
-''' Fit cycles of force-displacement data to model '''
-def fit_magnet_force(filename, fighandle=''):
-    if fighandle == '':
-        fig = plt.figure('magnet force')
-        plt.title("Cylindrical magnet - attraction")
-        plt.xlabel("Displacement (m)")
-        plt.ylabel("Load (N)")
+# Import and analyze experiments relating to this model -----------------------
+def fit_magnet_force(filename, zeroDisp=0, speed=1, figFlag=False, saveFlag=False, figdir='', filterFlag=False):
+    ''' Fit cycles of force-displacement data to dipole model.  
+        Check that the optional parameter values are correct for the test: 
+            zeroDisp:   [mm] true distance between centers of squares at zero
+                        displacement, as measured in ImageJ from photo
+            speed:      [mm/s] test speed
+    '''
+    
+
+
+    # Import data; split multicycle array into tension and compression for each
+    cols = [0,1,4] #time, load, cycle number
+    arr = np.genfromtxt(filename,dtype=float,delimiter=',',skip_header=17,usecols=cols)
+    cycle = np.split(arr, np.where(np.diff(arr[:,2]))[0]+1)
+    if len(cycle) == 3:
+        leg = 1
+    elif len(cycle) == 1:
+        leg = 0
     else:
-        fig = plt.figure(fighandle)
+        print("Error: can only analyze tension or single-cycle (tension-compression) data")
+    disp = 1e-3*(cycle[leg][:,0]*speed - cycle[leg][0,0]*speed + zeroDisp)
+    load = cycle[leg][:,1]
 
-    cols = [0,1,4]
-    arr = np.genfromtxt(filename,dtype=float,delimiter=',',skip_header=17,usecols=cols)#,names=["cycle","disp","load","time"]     
+    if filterFlag:
+        disp, load = tensiletest.filter_raw_data(disp, load, 20, cropFlag=True)
+
+    # Fit to model and plot
+    params, dm = opt.curve_fit(model_force, disp, load)
     
-    # Split single array into individual arrays for each full cycle, then into
-    # tension and compression portion of each cycle
-    speed = 1 # mm/s
-    zeroDisp = 7.85 # Measured from photo
-    disp_t = arr[:][1]*speed - arr[0][1]*speed + zeroDisp
-    load_t = arr[:][2]
-
-    mFit, dm = curve_fit(model_force, 0.001*disp_t, load_t)
+    if figFlag:
+        plt.figure(dpi=200)
+        plt.title("Cylindrical magnet, attraction")
+        plt.xlabel("Displacement (mm)")
+        plt.ylabel("Load (N)")
+        plt.plot(1e3*disp, load, 'k')
+        plt.plot(1e3*disp, model_force(disp, params[0]), 'r--', label='m = {0:.6f}'.format(params[0]))
+        plt.xlim(left=0.0)
+        plt.title(os.path.split(filename)[-1])
+        plt.legend()
+        if saveFlag:
+            plt.savefig(os.path.join(figdir,"magnet_force_fit.png"),dpi=300)
     
-    plt.plot(0.001*disp_t, load_t)
-    plt.plot(0.001*disp_t, model_force(0.001*disp_t, mFit), 'r--')
-    print("m = {0:.4f}".format(mFit[0]))
+    return params, model_force
+
+def fit_magnet_forces(sourcedir, zeroDisp=0, saveFlag=False, figdir=''):
+    filelist = os.listdir(sourcedir)
+    nT = len(filelist)
+    m_list = []
+    for i, fname in enumerate(filelist):
+        if os.path.splitext(fname)[-1] == '.csv':
+            specs = os.path.splitext(fname)[0]
+            if '200820' in specs and 'tension' in specs and 'attract' in specs:
+                speed = float(re.search("_(\d+\.\d+)mmps", specs).group(1))
+                if speed == 1.0:
+                    fullpath = os.path.join(sourcedir, fname)
+                    params, model = fit_magnet_force(fullpath, zeroDisp=zeroDisp, speed=speed, filterFlag=True)
+                    m_list.append(params[0])
+    moment_avg = np.mean(m_list)
+    moment_std = np.std(m_list)
+    print('Magnetic moment: {0:.4f} +/- {1:.4f} N/A^2'.format(moment_avg, moment_std))
     
-    return mFit, modelMagnet
-
-
-''' Determine if magnetic moment drops with temperature '''
-def determine_temp_dependence(filelist):
-           
-    fighandle = 'magnet temp test'
-    plt.figure(fighandle)
-    plt.title("Cylindrical magnet - attract")
-    plt.xlabel("Displacement (m)")
-    plt.ylabel("Load (N)")
-
-    fname = 'magnet_cylinder_quarterInch_40mm_1mmps_attract.csv'
+    return moment_avg
     
-    for fname in filelist:
-        fullpath = os.path.join(sourcepath, fname) #update
-        params, model = fit_magnet_force(fullpath, fighandle=fighandle)
 
-
-if __name__ == '__main__':
-    import os
-    import sys
+def determine_temp_dependence(sourcedir, zeroDisp=0, saveFlag=False, figdir=''):
+    ''' Determine if magnetic moment drops degrades after exposure to high 
+        temperatures. For each test, the same pair of magnets was exposed to
+        the given temperatures, in increasing order '''
     
+    filelist = os.listdir(sourcedir)
+    nT = len(filelist)
+    T = np.zeros(nT)
+    m = np.zeros(nT)
+    for i, fname in enumerate(filelist):
+        fullpath = os.path.join(sourcedir, fname)
+        temp = os.path.splitext(fname)[0].split('_')[-1]
+        T[i] = int(temp.strip('C'))
+        params, model = fit_magnet_force(fullpath, zeroDisp=zeroDisp)
+        m[i] = params[0]
+        plt.title('$T$ = {0}$^\circ$C'.format(T[i]))
+ 
+    plt.figure('magnet_temperature_test',dpi=200)
+    plt.title("Magnetic strength degradation")
+    plt.xlabel("$T$ ($^\circ$C)")
+    plt.ylabel("$m$ (NA$^2$)")
+    plt.plot(T, m, 'ok')
+    if saveFlag:
+        plt.savefig(os.path.join(figdir,"magnet_temp_dependence.svg"), transparent=True)
+        plt.savefig(os.path.join(figdir,"magnet_temp_dependence.png"), dpi=200)
+    
+    return
+
+
+if __name__ == '__main__':   
     cwd = os.path.dirname(os.path.abspath(__file__))
     split = os.path.split(cwd)
     if split[1] == 'modules':
         cwd = split[0]
-    sys.path.append(os.path.join(cwd,"data/raw"))
-    sys.path.append(os.path.join(cwd,"tmp"))
-
-    fit_magnet_force(filename, fighandle='')
-
-    determine_temp_dependence(os.listdir(sourcepath))
-    #exportpath = os.path.join(basepath, 'Raw_%s'%foldername)
-    #if os.path.exists(exportpath) == False:
-    #    os.mkdir(exportpath)
-    #filenames = os.listdir(sourcepath)
+    rawdir = os.path.join(cwd,"data/raw/magnet_properties")
+    tmpdir = os.path.join(cwd,"tmp")
+    
