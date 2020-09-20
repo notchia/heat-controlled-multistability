@@ -1,3 +1,1 @@
 # Heat-controlled Multistability
-
-## Description
