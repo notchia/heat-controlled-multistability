@@ -68,12 +68,12 @@ def fit_LCE_strain(filepath, saveFlag=False, figdir=''):
     print(modelstr)
 
     plt.xlabel("Temperature ($^{\circ}$C)")
-    plt.ylabel("Strain (mm/mm)")
+    plt.ylabel("Strain $\epsilon$ (mm/mm)")
     plt.plot(T_model, L_model, linestyle='-', color='k', linewidth=2, zorder=3,
              label="exponential fit up to {0}$^\circ$C".format(maxTemp))
     plt.legend()
     if saveFlag:
-        plt.savefig(os.path.join(figdir,'LCE_strain.svg'),dpi=300)
+        plt.savefig(os.path.join(figdir,'LCE_strain.svg'))
         plt.savefig(os.path.join(figdir,'LCE_strain.png'),dpi=200)
 
     return params, model_strain
@@ -121,7 +121,7 @@ def fit_LCE_contraction_200316(filename, saveFlag=False, figdir=''):
         plt.savefig(os.path.join(figdir, "LCE_strain.png"), dpi=200)
     
     return params, model_strain
-
+"""
 def fit_LCE_modulus(filename, saveFlag=False, figdir=''):
     ''' Fit LCE elastic modulus data (from DMA) to a mostly-empirical model.
         - Takes experimental data path
@@ -159,10 +159,13 @@ def fit_LCE_modulus(filename, saveFlag=False, figdir=''):
         plt.savefig(os.path.join(figdir, 'LCE_modulus.png'), dpi=200)
 
     return params, model_elastic_modulus
-
+"""
 def fit_LCE_modulus_avg(sourcedir, saveFlag=False, figdir='', verboseFlag=False):
-    ''' Fit LCE elastic modulus data (from DMA) to a mostly-empirical model.
-        - Takes experimental data path
+    ''' Fit LCE storage and loss modulus data (from DMA) to an empirical model.
+        - Takes experimental data source directory
+        - Smooths and interpolates E' and E'' data for each file in directory
+        - Finds and plots mean and std for E' and E''
+        - Finds best-fit parameters for exponential model for E''
         - Returns the fitting parameters list and the model function '''
     
     filelist = os.listdir(sourcedir)
@@ -171,18 +174,21 @@ def fit_LCE_modulus_avg(sourcedir, saveFlag=False, figdir='', verboseFlag=False)
     interpEs = []
     interpEl = []
     for filename in filelist:
-    
-        # Import data and convert to strain
+        # Import data
         data = np.genfromtxt(os.path.join(sourcedir, filename), skip_header=2, delimiter='\t')
-        windowSize = 4
-        cropIndex = math.ceil(windowSize/2)
-        E_s = tensiletest.running_mean_centered(data[:,1], windowSize)[cropIndex:-cropIndex]
-        E_l = tensiletest.running_mean_centered(data[:,2], windowSize)[cropIndex:-cropIndex]
-        T = data[cropIndex:-cropIndex,4]
-        if T[0] > T_min:
-            T_min = T[0]
-        if T[-1] < T_max:
-            T_max = T[-1]
+        E_s = data[:,1]
+        E_l = data[:,2]
+        T = data[:,4]
+        # Smooth and crop data
+        #windowSize = 4
+        #cropIndex = math.ceil(windowSize/2)
+        #E_s = tensiletest.running_mean_centered(E_s, windowSize)[cropIndex:-cropIndex]
+        #E_l = tensiletest.running_mean_centered(E_l, windowSize)[cropIndex:-cropIndex]
+        #T = T[cropIndex:-cropIndex]
+        if min(T) > T_min:
+            T_min = min(T)
+        if max(T) < T_max:
+            T_max = max(T)
        
         # Semilog plot shear, loss, total, and Young's moduli and fit 
         if verboseFlag:
@@ -204,6 +210,7 @@ def fit_LCE_modulus_avg(sourcedir, saveFlag=False, figdir='', verboseFlag=False)
             modelstr = "LCE fit:\t modulus = exp({0:.6f}(T-{1:.2f})) + {2:.0f}".format(params[0], params[1], params[2])    
             print(modelstr)
         
+        # Add interpolation functions to list
         interpEs.append(interp.interp1d(T, E_s))
         interpEl.append(interp.interp1d(T, E_l))
 

@@ -186,7 +186,7 @@ def fit_magnet_and_collision_weighted(disp, force, p_guess, p_given, weights,
     # Fit to model
     p_fit, _ = opt.curve_fit(fcn_to_fit, disp, force, #method='trf',
                              #bounds=([0.0,1e-30,1],[0.50,1e-1,100]),
-                             p0=p_guess, sigma=weights, maxfev=1600)
+                             p0=p_guess, sigma=weights, maxfev=12800)
     print(p_fit)
     moment, qlim, klim = p_fit
     paramstr = "moment: {0:.4f} A$\cdot$m$^2$\n$q_{{lim}}$: {1:.4f}$^\circ$\n$k_{{lim}}$: {2:.4f} Nm".format(moment, np.degrees(qlim), klim)

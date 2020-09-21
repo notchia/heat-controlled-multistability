@@ -82,10 +82,7 @@ class UnitCellData:
                           "magnets": self.magnets})
 
     def set_zero_with_angle(self, bilayerDict):
-        hinge = bilayer.BilayerModel(self.h, self.r, T=self.T,
-                               LCE_strain_params=bilayerDict["LCE_strain_params"],
-                               LCE_modulus_params=bilayerDict["LCE_modulus_params"],
-                               b=bilayerDict["b"])
+        hinge = bilayer.BilayerModel(self.h, self.r, T=self.T, **bilayerDict)
         nominalZero = model.rot2disp(hinge.thetaT, self.d/2)
         zeroIndex = np.where(self.disp < nominalZero)[0][0] # CHECK THIS
         self.zeroOffset = self.load[zeroIndex]

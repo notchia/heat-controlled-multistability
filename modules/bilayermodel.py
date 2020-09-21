@@ -22,12 +22,12 @@ class BilayerModel:
     def __init__(self, h_total, ratio, T=25.0,
                  LCE_strain_params=[0.039457,142.37,6.442e-3],
                  LCE_modulus_params=[-8.43924097e-02,2.16846882e+02,3.13370660e+05],
-                 w=0.010, b=[], s=0):
+                 w=0.010, b=[], s=0, bFlag='lin'):
         
         assert T > 20.0, "Invalid T: lower than room temperature"
         assert h_total > 0, "Invalid h: must be positive"
         assert h_total < 0.01, "Make sure h is in meters, not millimeters"
-        assert (ratio >= 0 and ratio < 1), "Invalid r: must be within [0,1)"
+        assert (ratio >= 0 and ratio < 1), "Invalid r: must be in [0,1)"
         
         # Main model parameters
         self.T = T                  # [Celcius]     Temperature
@@ -43,8 +43,9 @@ class BilayerModel:
         # Geometric parameters: out-of-plane width w, and arc length s
         self.w = w
         if s == 0:
-            assert b, 'Specify either arc length s or parameters b=[b0, b1]'
-            self.s = quadratic_pure(h_total, b)
+            assert b, 'Specify either arc length s or parameters b'
+            self.bFlag = bFlag
+            self.s = self._calculate_arc_length(b, bFlag)
         else:
             assert s < 0.01, "Make sure s is in meters, not millimeters"
             self.s = s
@@ -69,6 +70,16 @@ class BilayerModel:
         self.thetaT = self._calculate_angle(T)
         return
              
+    def _calculate_arc_length(self, b, bFlag):
+        ''' Using arc length parameters b, compute effective arc length s from
+            hinge thickness h '''
+        if bFlag == 'lin':
+            s = b[1]*self.h_total + b[0]
+        elif bFlag == 'quad':
+            s = b[0]*self.h_total**2
+        else:
+            assert False, "choose 'lin' or 'quad' for arc length fitting"
+        return s
         
     def _calculate_stiffness(self):
         ''' Using physical parameters, calculate effective linear spring constant 
@@ -112,16 +123,19 @@ class BilayerModel:
 
 #%%
 def test_BilayerModel():
-    ''' Sanity checks on BilayerModel '''
-         
-    bilayer = BilayerModel(0.001, 0.0, b=[0,1])
+    ''' Speed test and sanity checks on BilayerModel '''
+    
+    h_total = 0.001
+    b = [3]
+    
+    bilayer = BilayerModel(h_total, 0.0, b=b)
     kappa0 = bilayer.curvature
     bilayer.update_temperature(100)
     kappa1 = bilayer.curvature
     assert kappa0 == kappa1, 'r = 0 should not bend with temperature change'
 
     t0 = time.perf_counter()
-    bilayer = BilayerModel(0.001, 0.5, b=[0,1])
+    bilayer = BilayerModel(h_total, 0.5, b=b)
     kappa0 = bilayer.curvature
     t1 = time.perf_counter()
     bilayer.update_temperature(100)
@@ -206,28 +220,28 @@ def analyze_data_200814(filepath):
     plt.legend()
 
     # Compute model values for these parameters (with arc length = thickness)
-    curvature_from_model = np.zeros_like(curvature_avg)
-    angle_from_model = np.zeros_like(curvature_avg)
+    curvature_model = np.zeros_like(curvature_avg)
+    angle_model = np.zeros_like(curvature_avg)
     for i in range(nCombos):
         h_val = h[i]
         r_val = r[i]
         bilayer = BilayerModel(h_val*1e-3, r_val, b=[0,1])
         for j in range(nTemps):
             bilayer.update_temperature(T[j])
-            curvature_from_model[j,i] = bilayer.curvature
-            angle_from_model[j,i] = bilayer.thetaT
+            curvature_model[j,i] = bilayer.curvature
+            angle_model[j,i] = bilayer.thetaT
     
     # Plot curvature and angle, comparing model and experiments
     plt.figure('temp-curvature-model', dpi=200)
     plt.xlabel("Temperature ($^{{\circ}}C$)")
     plt.ylabel("Change in curvature $\kappa - \kappa_0$ (1/m)")
-    curvature_avg_zeroed = curvature_avg - curvature_avg[0]
+    curvature_change_avg = curvature_avg - curvature_avg[0]
 
     for i in range(nCombos):
         labelstr="h = {0:.1f} mm, r = {1:.2f}".format(h[i], r[i])
-        plt.errorbar(T, curvature_avg_zeroed[:,i], yerr=curvature_std[:,i], fmt='o', capsize=2,
+        plt.errorbar(T, curvature_change_avg[:,i], yerr=curvature_std[:,i], fmt='o', capsize=2,
                      label=labelstr, color=colors[i])
-        plt.plot(T, curvature_from_model[:,i], marker='.', linestyle='dashed',
+        plt.plot(T, curvature_model[:,i], marker='.', linestyle='dashed',
                  linewidth=2, color=colors[i],label='model: '+labelstr)
     plt.legend()
 
@@ -239,7 +253,7 @@ def analyze_data_200814(filepath):
         labelstr="h = {0:.1f} mm, r = {1:.2f}".format(h[i], r[i])
         plt.errorbar(T, angle_avg[:,i], yerr=angle_std[:,i], fmt='o', capsize=2,
                      label=labelstr, color=colors[i])
-        plt.plot(T, np.degrees(angle_from_model[:,i]), marker='.', linestyle='dashed',
+        plt.plot(T, np.degrees(angle_model[:,i]), marker='.', linestyle='dashed',
                  linewidth=2, color=colors[i],label='model: '+labelstr)        
     plt.legend()
 
@@ -251,13 +265,13 @@ def analyze_data_200814(filepath):
     for i in range(nTemps):
         plt.errorbar(r, np.transpose(angle_avg[i,:]), yerr=np.transpose(angle_std[i,:]), fmt='o', capsize=2,
                      label="T = {0}".format(T[i]), color=colors[i])
-        #plt.plot(r, np.transpose(np.degrees(angle_from_model[i,:])), marker='^', linewidth=0, color=colors[i],label="T = {0}, model".format(T[i]))  
+        #plt.plot(r, np.transpose(np.degrees(angle_model[i,:])), marker='^', linewidth=0, color=colors[i],label="T = {0}, model".format(T[i]))  
     plt.legend()
     # Relation to total thickness h:
     plt.figure('thickness-curvature', dpi=200)
     plt.xlabel("Total thickness h (mm/mm)")
     plt.ylabel("Normalized curvature $(\kappa - \kappa_0)/r$ (1/m)")
-    normalized_curvature_avg = np.divide(curvature_avg_zeroed, r)
+    normalized_curvature_avg = np.divide(curvature_change_avg, r)
     normalized_curvature_std = np.divide(curvature_std, r)
     for i in range(nTemps):
         plt.errorbar(h, np.transpose(normalized_curvature_avg[i,:]), yerr=np.transpose(normalized_curvature_std[i,:]), fmt='o', capsize=2,
@@ -267,10 +281,13 @@ def analyze_data_200814(filepath):
     return
 
 
-def analyze_data_200819(paramfile, datafile, LCE_modulus_params=[-0.082755,237.64,1097398],
-                        saveFlag=False, figdir=''):
-    ''' Process samples 1-6. Note samples 4 & 5 are nominally the same, so compiled into one'''
+def analyze_data_200819(paramfile, datafile, LCE_modulus_params=[], LCE_strain_params=[],
+                        saveFlag=False, figdir='', verboseFlag=False):
+    ''' Process bending data for bilayer samples 1-6 (note samples 4 & 5 are
+        nominally the same, so these were combined).'''
     
+    # Import data -------------------------------------------------------------
+    # Import parameter information                                               
     arr = np.genfromtxt(paramfile,dtype=float,delimiter=',',skip_header=2)
     h = arr[0,1:6]
     r = arr[1,1:6]
@@ -278,6 +295,9 @@ def analyze_data_200819(paramfile, datafile, LCE_modulus_params=[-0.082755,237.6
     r_std = arr[0,6:]
     print('h: ' + ', '.join(['{:.2f}'.format(val) for val in h]) + ' (mm)')
     print('r: ' + ', '.join(['{:.2f}'.format(val) for val in r]) + ' (mm/mm)')
+    
+    # Import curvature for above parameters, as measured in ImageJ using the
+    # Three Point Circle tool (1/radius of curvature)
     arr = np.genfromtxt(datafile,dtype=float,delimiter=',',skip_header=1)
     T = arr[:,0]
     curvature_avg = arr[:,1:6]
@@ -285,143 +305,164 @@ def analyze_data_200819(paramfile, datafile, LCE_modulus_params=[-0.082755,237.6
     
     nTemps = curvature_avg.shape[0]
     nCombos = curvature_avg.shape[1]
-    
-    #s = h # use arc length = thickness
-    angle_avg = np.degrees(1e-3*np.multiply(h,curvature_avg))
-    angle_std = np.degrees(1e-3*np.multiply(h,curvature_std))
-    angle_avg = angle_avg - angle_avg[0]
-    
-    colors = ['blue','orange','red','green','purple','brown','pink','gray','olive','cyan','magenta']
-    
-    # Plot measured curvature as a function of temperature for all samples
-    plt.figure('temp-curvature1', dpi=200)
-    plt.xlabel("Temperature ($^{{\circ}}C$)")
-    plt.ylabel("Measured curvature $\kappa$ (1/m)")
-    for i in range(nCombos):
-        plt.errorbar(T, curvature_avg[:,i], yerr=curvature_std[:,i], 
-                     label="h = {0:.1f} mm, r = {1:.2f}".format(h[i], r[i]), 
-                     fmt='o', capsize=2, color=colors[i])
-    plt.legend()
 
-    # Compute model values for these parameters (with arc length = thickness)
+    # Compute model values for these parameters -------------------------------
+    # Note: arc length = thickness, as normalization parameter
     T_range = np.arange(T[0],T[-1],1)
     nTempRange = len(T_range)
-    curvature_from_model = np.zeros((nTempRange,nCombos))
-    angle_from_model = np.zeros((nTempRange,nCombos))
-
+    curvature_model = np.zeros((nTempRange,nCombos))
+    curvature_change_model = np.zeros((nTempRange,nCombos))
     for i in range(nCombos):
         h_val = h[i]
         r_val = r[i]
-        bilayer = BilayerModel(h_val*1e-3, r_val, b=[0,1], LCE_modulus_params=LCE_modulus_params)
+        bilayer = BilayerModel(h_val*1e-3, r_val, b=[0,1], bFlag='lin',
+                               LCE_modulus_params=LCE_modulus_params,
+                               LCE_strain_params=LCE_strain_params)
         for j in range(nTempRange):
             bilayer.update_temperature(T_range[j])
-            curvature_from_model[j,i] = bilayer.curvature
-            angle_from_model[j,i] = bilayer.thetaT
-    
-    # Plot curvature and angle, comparing model and experiments
-    # Change in curvature: 
-    plt.figure('temp-curvature-model1', dpi=200)
-    plt.xlabel("Temperature ($^{{\circ}}C$)")
-    plt.ylabel("Change in curvature $\kappa - \kappa_0$ (1/m)")
-    curvature_avg_zeroed = curvature_avg - curvature_avg[0]
-    for i in range(nCombos):
-        labelstr="h = {0:.1f} mm, r = {1:.2f}".format(h[i], r[i])
-        plt.errorbar(T, curvature_avg_zeroed[:,i], yerr=curvature_std[:,i], fmt='o', capsize=2,
-                     label=labelstr, color=colors[i])
-        plt.plot(T_range, curvature_from_model[:,i], linestyle='dashed',
-                 linewidth=2, color=colors[i],label='model: '+labelstr)
-    plt.legend()
-    plt.tight_layout()
-    if saveFlag:
-        plt.savefig(os.path.join(figdir,"bilayer_curvature.svg"), transparent=True)
-        plt.savefig(os.path.join(figdir,"bilayer_curvature.png"), dpi=200)
-    # Change in angle: 
-    fig = plt.figure('temp-angle1', dpi=200) 
-    plt.xlabel("Temperature ($^{{\circ}}C$)")
-    plt.ylabel("Change in angle $h(\kappa - \kappa_0)$ (deg)")
-    for i in range(nCombos):
-        labelstr="h = {0:.1f} mm, r = {1:.2f}".format(h[i], r[i])
-        plt.errorbar(T, angle_avg[:,i], yerr=angle_std[:,i], fmt='o', capsize=2,
-                     label=labelstr, color=colors[i])
-        plt.plot(T_range, np.degrees(angle_from_model[:,i]), linestyle='dashed',
-                 linewidth=2, color=colors[i],label='model: '+labelstr)        
-    plt.legend()
-    plt.tight_layout()
-    if saveFlag:
-        plt.savefig(os.path.join(figdir,"bilayer_angle.svg"), transparent=True)
-        plt.savefig(os.path.join(figdir,"bilayer_angle.png"),dpi=200)
-    # Change in curvature, normalized by r: 
-    normalized_curvature_avg = np.divide(curvature_avg_zeroed, r)
-    normalized_curvature_std = np.divide(curvature_std, r)
-    normalized_curvature_from_model = np.divide(curvature_from_model, r)
-    plt.figure('temp-curvature-model-norm', dpi=200)
-    plt.xlabel("Temperature ($^{{\circ}}C$)")
-    plt.ylabel("Normalized change in curvature $(\kappa - \kappa_0)/r$ (1/m)")
-    for i in range(nCombos):
-        labelstr="h = {0:.1f} mm, r = {1:.2f}".format(h[i], r[i])
-        plt.errorbar(T, normalized_curvature_avg[:,i], yerr=normalized_curvature_std[:,i], fmt='o', capsize=2,
-                     label=labelstr, color=colors[i])
-        plt.plot(T_range, normalized_curvature_from_model[:,i], linestyle='dashed',
-                 linewidth=2, color=colors[i],label='model: '+labelstr)
-    plt.legend()
-    plt.tight_layout()
-    if saveFlag:
-        plt.savefig(os.path.join(figdir,"bilayer_normalized_curvature.png"), dpi=200)
-        fig.patch.set_facecolor('None')
-        plt.savefig(os.path.join(figdir,"bilayer_normalized_curvature.svg"), transparent=True)
+            curvature_model[j,i] = bilayer.curvature
+        curvature_change_model[:,i] = curvature_model[:,i] - curvature_model[0,i]
+
+    # Analyze and plot data ---------------------------------------------------    
+
+    def plot_values_with_temperature(y_data_avg, y_data_std, y_model=np.array([]),
+                                     title='', ylabel='', RTindex=1):
+        ''' Plot temperature-series values, with model if applicable '''
         
-    # Can the curvature be normalized by some values?
-    # Relation to LCE:total thickness ratio r:
-    plt.figure('ratio-curvature1', dpi=200)
-    plt.xlabel("LCE:total ratio $r$ (mm/mm)")
-    plt.ylabel("Change in angle $h(\kappa - \kappa_0)$ (deg)")
-    for i in range(nTemps):
-        plt.errorbar(r, np.transpose(angle_avg[i,:]), yerr=np.transpose(angle_std[i,:]), xerr=np.transpose(r_std), fmt='o', capsize=2,
-                     label="T = {0}".format(T[i]), color=colors[i])
-        fit_to_r = np.polyfit(r, angle_avg[-2,:],1)
-    plt.plot(r, fit_to_r[0]*r + fit_to_r[1], color=colors[nTemps-2], label='linear fit')
-    plt.legend(bbox_to_anchor=(1.04,0.5), loc="center left")
-    plt.tight_layout()
-    if saveFlag:
-        plt.savefig(os.path.join(figdir,"bilayer_r_dependence.svg"), transparent=True)
-        plt.savefig(os.path.join(figdir,"bilayer_r_dependence.png"), dpi=200)
-    # Relation to total thickness h:
-    plt.figure('thickness-curvature1', dpi=200)
-    plt.xlabel("Total thickness $h$ (mm)")
-    plt.ylabel("Normalized curvature $(\kappa - \kappa_0)/r$ (1/m)")
-    normalized_curvature_avg = np.divide(curvature_avg_zeroed, r)
+        colors = ['blue','orange','red','green','purple','brown','pink','gray','olive','cyan','magenta']        
+        fig = plt.figure(title, dpi=200)
+        plt.xlabel("Temperature ($^{{\circ}}C$)")
+        plt.ylabel(ylabel)
+        for i in range(nCombos):
+            labelstr="h = {0:.1f} mm, r = {1:.2f}".format(h[i], r[i])
+            plt.errorbar(T[RTindex:], y_data_avg[RTindex:,i], yerr=y_data_std[RTindex:,i],
+                         fmt='o', capsize=2, label=labelstr, color=colors[i])
+            if y_model.any():
+                plt.plot(T_range, y_model[:,i], linestyle='dashed',
+                         linewidth=2, color=colors[i],label='model: '+labelstr)
+        plt.legend()
+        plt.tight_layout()
+        if saveFlag:
+            plt.savefig(os.path.join(figdir,"{0}.png".format(title)), dpi=200)
+            fig.patch.set_facecolor('None')
+            plt.savefig(os.path.join(figdir,"{0}.svg".format(title)), transparent=True)
+        
+        return
+
+    # Plot measured curvature as a function of temperature for all samples      
+    plot_values_with_temperature(curvature_avg, curvature_std,
+                                 title='temperature-curvature_raw',
+                                 ylabel='Measured curvature $\kappa$ (1/m)',
+                                 RTindex=0)
+
+    # Change in curvature
+    curvature_change_avg = curvature_avg - curvature_avg[0]
+
+    # Change in angle (curvature normalized by h): 
+    # Use arc length s = thickness h to compute normalized angle
+    angle_avg = 1e-3*np.multiply(h,curvature_change_avg)
+    angle_std = 1e-3*np.multiply(h,curvature_std)
+    angle_model = 1e-3*np.multiply(h,curvature_model)
+    plot_values_with_temperature(angle_avg, angle_std,
+                                 y_model=angle_model,
+                                 title='bilayer_temperature-angle_model',
+                                 ylabel='Normalized curvature change\n$h(\kappa - \kappa_0)$')
+
+    # Change in normalized curvature (curvature normalized by r): 
+    normalized_curvature_avg = np.divide(curvature_change_avg, r)
     normalized_curvature_std = np.divide(curvature_std, r)
-    for i in range(nTemps):
-        plt.errorbar(h, np.transpose(normalized_curvature_avg[i,:]), yerr=np.transpose(normalized_curvature_std[i,:]), xerr=np.transpose(h_std), fmt='o', capsize=2,
-                     label="T = {0}".format(T[i]), color=colors[i])
-    fit_to_h = np.polyfit(h, normalized_curvature_avg[-2,:],1)
-    plt.plot(h, fit_to_h[0]*h + fit_to_h[1], color=colors[nTemps-2], label='linear fit')
-    plt.legend(bbox_to_anchor=(1.04,0.5), loc="center left")
-    plt.tight_layout()
-    if saveFlag:
-        plt.savefig(os.path.join(figdir,"bilayer_h_dependence1.svg"), transparent=True)
-        plt.savefig(os.path.join(figdir,"bilayer_h_dependence1.png"), dpi=200)    
-    # Another relation to total thickness h:
-    normalized_angle_avg = np.divide(angle_avg, r)
-    normalized_angle_std = np.divide(angle_std, r)
-    plt.figure('thickness-angle1', dpi=200)
-    plt.xlabel("Total thickness $h$ (mm)")
-    plt.ylabel("Change in normalized angle $h(\kappa - \kappa_0)/r$ (deg)")
-    for i in range(nTemps):
-        plt.errorbar(h, np.transpose(normalized_angle_avg[i,:]), yerr=np.transpose(normalized_angle_std[i,:]), xerr=np.transpose(h_std), fmt='o', capsize=2,
-                     label="T = {0}".format(T[i]), color=colors[i])
-    fit_to_h_norm = np.polyfit(h, normalized_angle_avg[-2,:],1)
-    plt.plot(h, fit_to_h_norm[0]*h + fit_to_h_norm[1], color=colors[nTemps-2], label='linear fit')
-    plt.legend(bbox_to_anchor=(1.04,0.5), loc="center left")
-    plt.tight_layout()
-    if saveFlag:
-        plt.savefig(os.path.join(figdir,"bilayer_h_dependence2.svg"), transparent=True)
-        plt.savefig(os.path.join(figdir,"bilayer_h_dependence2.png"), dpi=200)    
+    normalized_curvature_model = np.divide(curvature_change_model, r)        
+
+    # Change in normalized angle (curvature normalized by h and r): 
+    normalized_angle_avg = 1e-3*np.multiply(h, normalized_curvature_avg)
+    normalized_angle_std = 1e-3*np.multiply(h, normalized_curvature_std)
+    normalized_angle_model = 1e-3*np.multiply(h, normalized_curvature_model)
+
+    # Change in normalized curvature (curvature normalized by ln(r)): 
+    log_r = -np.log(r)
+    normalized_curvature_log_avg = np.divide(curvature_change_avg, log_r)
+    normalized_curvature_log_std = np.divide(curvature_std, log_r)
+    normalized_curvature_log_model = np.divide(curvature_model, log_r)
+
+    # Change in normalized angle (curvature normalized by h and ln(r)): 
+    normalized_angle_log_avg = 1e-3*np.multiply(h, normalized_curvature_log_avg)
+    normalized_angle_log_std = 1e-3*np.multiply(h, normalized_curvature_log_std)
+    normalized_angle_log_model = 1e-3*np.multiply(h, normalized_curvature_log_model)
+    plot_values_with_temperature(normalized_angle_log_avg, normalized_angle_log_std,
+                                 y_model=normalized_angle_log_model,
+                                 title='bilayer_temperature-logangle_model',
+                                 ylabel='Normalized curvature change\n$h(\kappa - \kappa_0)/(-\ln(r))$')
+
+    if verboseFlag:
+        plot_values_with_temperature(curvature_change_avg, curvature_std,
+                                     y_model=curvature_change_model,
+                                     title='bilayer_temperature-curvature_model',
+                                     ylabel='Change in curvature $\kappa-\kappa_0$ (1/m)')
+        plot_values_with_temperature(normalized_curvature_avg, normalized_curvature_std,
+                                     y_model=normalized_curvature_model,
+                                     title='bilayer_temperature-normcurvature_model',
+                                     ylabel='Normalized curvature change\n$(\kappa - \kappa_0)/r$ (1/m)')
+        plot_values_with_temperature(normalized_angle_avg, normalized_angle_std,
+                                     y_model=normalized_angle_model,
+                                     title='bilayer_temperature-normangle_model',
+                                     ylabel='Normalized curvature change\n$h(\kappa - \kappa_0)/r$')
+        plot_values_with_temperature(normalized_curvature_log_avg, normalized_curvature_log_std,
+                                     y_model=normalized_curvature_log_model,
+                                     title='bilayer_temperature-logcurvature_model',
+                                     ylabel='Normalized curvature change\n$(\kappa - \kappa_0)/(-\ln(r))$ (1/m)')
+
+    # Can the curvature be normalized by some values? -------------------------
+    # Relation to LCE:total thickness ratio r:
+
+    def plot_values_with_parameter(x_avg, x_std, y_avg, y_std,
+                                   title='', xlabel='', ylabel='',
+                                   fitFlag=False):
+        ''' Plot values w.r.t. parameter values, with fit to T=90C data '''
+        
+        colors = ['blue','orange','red','green','purple','brown','pink','gray','olive','cyan','magenta']   
+        plt.figure(title, dpi=200)
+        plt.xlabel(xlabel)
+        plt.ylabel(ylabel)
+        for i in range(nTemps):
+            plt.errorbar(x_avg, np.transpose(y_avg[i,:]), yerr=np.transpose(y_std[i,:]),
+                         xerr=np.transpose(x_std), fmt='o', capsize=2,
+                         label="T = {0}".format(T[i]), color=colors[i])
+            fit_to_x = np.polyfit(x_avg, y_avg[-2,:],1)
+        if fitFlag:
+            plt.plot(x_avg, np.polyval(fit_to_x, x_avg), color=colors[nTemps-2], label='linear fit')
+        plt.legend(bbox_to_anchor=(1.04,0.5), loc="center left")
+        plt.tight_layout()
+        if saveFlag:
+            plt.savefig(os.path.join(figdir,"{0}.svg".format(title)), transparent=True)
+            plt.savefig(os.path.join(figdir,"{0}.png".format(title)), dpi=200)    
+        
+        return
+        
+    # Relation to composite ratio r
+
+    plot_values_with_parameter(r, r_std, angle_avg, angle_std,
+                               title='bilayer_ratio-normcurvature',
+                               xlabel='LCE:total ratio $r$ (mm/mm)',
+                               ylabel='Normalized curvature change $h(\kappa - \kappa_0)$')
+
+    # Relation to total thickness h
+    plot_values_with_parameter(h, h_std, normalized_curvature_avg, normalized_curvature_std,
+                               title='bilayer_thickness-curvature1',
+                               xlabel='Total thickness $h$ (mm)',
+                               ylabel='Normalized curvature change $(\kappa - \kappa_0)/r$')
+
+    # Relation to total thickness h
+    plot_values_with_parameter(h, h_std, normalized_angle_avg, normalized_angle_std,
+                               title='bilayer_thickness-curvature2',
+                               xlabel='Total thickness $h$ (mm)',
+                               ylabel='Normalized curvature change $h(\kappa - \kappa_0)/r$')
+    
+    """
     # Scale the model by a fit to h. Really what should be done is finding fit_to_h
     # for each temperature, then fitting a curve to how the slope of the fit
     # changes with temperature. Right now the fit is probably good enough that
     # this is unnecessary.
-    normalized_adjusted_curvature = adjust_by_h(h, r, normalized_curvature_from_model, fit_to_h=fit_to_h, h_ref=h[0])
+    normalized_adjusted_curvature = adjust_by_h(h, r, normalized_curvature_model, fit_to_h=fit_to_h, h_ref=h[0])
     plt.figure('temp-curvature-model-adjust-norm', dpi=200)
     plt.xlabel("Temperature ($^{{\circ}}C$)")
     plt.ylabel("Normalized change in curvature $(\kappa - \kappa_0)/r$,\n     adjusted model (1/m)")
@@ -432,10 +473,11 @@ def analyze_data_200819(paramfile, datafile, LCE_modulus_params=[-0.082755,237.6
         plt.plot(T_range, normalized_adjusted_curvature[:,i], linestyle='dashed',
                  linewidth=2, color=colors[i],label='model: '+labelstr)
     plt.legend()
-    plt.tight_layout()
+    plt.tight_layout()"""
 
     return
 
+"""
 def adjust_by_h(h_vals, r_vals, modeled_curvature, fit_to_h=[1,0], h_ref=0):
     ''' Take array of N h_vals and N r_vals corresponding to the (N,M) cuvatures
     (for M temperature points) and the coefficients of a linear polyfit fit_to_h
@@ -455,13 +497,12 @@ def get_h_adjustment_coeff(h, r, fit_to_h, h_ref):
     ''' Using a fit to normalized_curvature as a function of h at a certain r value'''
     normalized_adjustment = (fit_to_h[0]*(h - h_ref))/(fit_to_h[0]*h_ref + fit_to_h[1])
     adjustment = 1 + normalized_adjustment*0.7
-    return adjustment
+    return adjustment"""
 
-
-""" 2D color plot of angle on h-T axes """  
-def analyze_angle_change_with_temp(LCE_modulus_params=[-0.082755,237.64,1097398],
-                                   b=[0.0,1.5], saveFlag=False, figdir=''):
     
+def analyze_curvature_change_with_temp(LCE_modulus_params=[],LCE_strain_params=[],
+                                   saveFlag=False, figdir='', verboseFlag=False):
+    ''' 2D color plot of angle on h-T axes '''
     h_range = 1e-3*np.arange(0.5,2.5,0.5) #[m]
     r_range = np.arange(0.01,1.0,0.01)
     T_range = np.arange(25,101,1)
@@ -469,74 +510,59 @@ def analyze_angle_change_with_temp(LCE_modulus_params=[-0.082755,237.64,1097398]
     for k, h in enumerate(h_range):
         kappaT_vals = np.zeros((len(T_range), len(r_range)))
         thetaT_vals = np.zeros((len(T_range), len(r_range)))
+        normT_vals = np.zeros((len(T_range), len(r_range)))
         for j, r in enumerate(r_range):
-            bilayer = BilayerModel(h, r, LCE_modulus_params=LCE_modulus_params, b=b)
+            bilayer = BilayerModel(h, r, LCE_modulus_params=LCE_modulus_params, s=h)
             for i, T in enumerate(T_range):
                 bilayer.update_temperature(T)
                 kappaT_vals[i,j] = bilayer.curvature
-                thetaT_vals[i,j] = np.degrees(bilayer.thetaT)
-        s = b[0]+b[1]*h
-        plot_angle_change_with_temp(h, s, r_range, T_range, thetaT_vals,
-                                    saveFlag=saveFlag, figdir=figdir)
-        plot_curvature_change_with_temp(h, s, r_range, T_range, kappaT_vals,
-                                    saveFlag=saveFlag, figdir=figdir)
+                thetaT_vals[i,j] = bilayer.thetaT
+                normT_vals[i,j] = h*bilayer.curvature/(-np.log(r))
+        colorplot_change_with_temp(h, h, r_range, T_range, thetaT_vals,
+                                   barLabel='Normalized curvature $h\kappa$', figLabel='thetaT',
+                                   saveFlag=saveFlag, figdir=figdir)
+        if verboseFlag:
+            colorplot_change_with_temp(h, h, r_range, T_range, kappaT_vals,
+                                       barLabel='Curvature $\kappa$ (1/m)', figLabel='kappaT',
+                                       saveFlag=saveFlag, figdir=figdir)
+            colorplot_change_with_temp(h, h, r_range, T_range, normT_vals,
+                                       barLabel='Normalized curvature $h\kappa/(-ln(r))$', figLabel='normT',
+                                       saveFlag=saveFlag, figdir=figdir)
     
     return
-  
 
-def plot_angle_change_with_temp(h, s, r_range, T_range, thetaT_vals, 
-                                saveFlag=False, figdir=''):
+def colorplot_change_with_temp(h, s, r_range, T_range, curvatureT_vals, 
+                               barLabel='', figLabel='', saveFlag=False, figdir=''):
     ''' 2D color plot of angle on h-T axes '''
     r_range, T_range = np.meshgrid(r_range, T_range)
-    colorlevels = np.arange(np.amin(thetaT_vals), np.amax(thetaT_vals), 0.5)
-    
-    fig = plt.figure()
-    ax = fig.gca()
-    surf = ax.contourf(r_range, T_range, thetaT_vals, levels=colorlevels)    
-    plt.xlabel('$r$ (mm/mm)')
-    plt.ylabel('$T$ ($^\circ$C)')
-    plt.title('$h$ = {0:0.2f} mm, $s$ = {1:0.2f} mm'.format(1000*h, 1000*s))
-    bar = fig.colorbar(surf, aspect=8)
-    bar.set_label('Angle (degrees)')
-    plt.tight_layout()
-    if saveFlag:
-        filename = 'thetaT_h{0:0.2f}_s{1:0.2f}.png'.format(1000*h, 1000*s)
-        plt.savefig(os.path.join(figdir,filename),dpi=200)
-        plt.close()
-
-    return
-
-def plot_curvature_change_with_temp(h, s, r_range, T_range, curvatureT_vals, 
-                                saveFlag=False, figdir=''):
-    ''' 2D color plot of angle on h-T axes '''
-    r_range, T_range = np.meshgrid(r_range, T_range)
-    colorlevels = np.arange(np.amin(curvatureT_vals), np.amax(curvatureT_vals), 0.5)
+    minVal = np.amin(curvatureT_vals)
+    maxVal = np.amax(curvatureT_vals)
+    level = maxVal/100
+    colorlevels = np.arange(minVal, maxVal, level)
     
     fig = plt.figure()
     ax = fig.gca()
     surf = ax.contourf(r_range, T_range, curvatureT_vals, levels=colorlevels)    
     plt.xlabel('$r$ (mm/mm)')
     plt.ylabel('$T$ ($^\circ$C)')
-    plt.title('$h$ = {0:0.2f} mm, $s$ = {1:0.2f} mm'.format(1000*h, 1000*s))
+    plt.title('$h$ = {0:0.2f} mm, $s$ = {1:0.2f} mm'.format(1e3*h, 1e3*s))
     bar = fig.colorbar(surf, aspect=8)
-    bar.set_label('Curvature (1/m)')
+    bar.set_label(barLabel)
     plt.tight_layout()
     if saveFlag:
-        filename = 'kappaT_h{0:0.2f}_s{1:0.2f}.png'.format(1000*h, 1000*s)
-        plt.savefig(os.path.join(figdir,filename),dpi=200)
-        plt.close()
+        filename = '{2}_h{0:0.2f}_s{1:0.2f}'.format(1e3*h, 1e3*s, figLabel)
+        plt.savefig(os.path.join(figdir,"{0}.png".format(filename)),dpi=200)
+        plt.savefig(os.path.join(figdir,"{0}.svg".format(filename)))
 
     return
 
-#%%
-def quadratic_with_x0(x, b2, b1, b0=0):
-    return b2*x**2 + b1*x + b0
+#%% Bending angle of unit cells
 
 def quadratic_pure(x, b):
     return b*x**2
 
 def analyze_bending_angles(datapath, parampath,
-                           LCE_modulus_params=[-8.43924097e-02,2.16846882e+02,3.13370660e+05],
+                           LCE_modulus_params=[], LCE_strain_params=[],
                            saveFlag=False, figdir='', titlestr=''):
     ''' Analyze ImageJ bend data '''
     # Import data
@@ -568,7 +594,8 @@ def analyze_bending_angles(datapath, parampath,
         r_val = r_avg[i]
         s_val = s_avg[i]
         bilayer = BilayerModel(h_val*1e-3, r_val, s=s_val*1e-3, T=24.3,
-                               LCE_modulus_params=LCE_modulus_params)
+                               LCE_modulus_params=LCE_modulus_params,
+                               LCE_strain_params=LCE_strain_params)
         theta0 = bilayer.thetaT
         for j, T_val in enumerate(T_range):
             bilayer.update_temperature(T_val)
@@ -581,33 +608,34 @@ def analyze_bending_angles(datapath, parampath,
     print(', '.join(['{0:.2f}'.format(s) for s in s_avg]))
     print(', '.join(['{0:.2f}'.format(s) for s in s_fit]))
 
-    plt.figure('h-vs-s',dpi=200)
-    if 'h' in titlestr:
-        mkr='o'
-    else:
-        mkr='^'
-        #hsfit, _ = opt.curve_fit(lambda x, b: b*x, h_avg, s_fit)
-        #b_fit = [0, hsfit[0]]
-        #plt.plot(h_avg, b_fit[1]*h_avg, 'r', label='linear fit to fixed-r data: s = {0:.2f}h + {1:.2f}'.format(*b_fit))
+    # Fit quadratic function to best-fit h-s relation
+    hsfit, _ = opt.curve_fit(quadratic_pure, h_avg, s_fit)
+    b_fit = 1e3*hsfit
+    h_range = np.arange(0.0, 2.01, 0.01)
+    s_model = quadratic_pure(h_range, hsfit)
 
-        hsfit, _ = opt.curve_fit(quadratic_pure, h_avg, s_fit)
-        b_fit = 1e3*hsfit#1e-3*hsfit#[1e-3*hsfit[1], hsfit[0]]
-        plt.plot(h_avg, quadratic_pure(h_avg, hsfit), 'r', label='fit to fixed-r data, with b = {0}'.format(b_fit))
-        
-    plt.plot(h_avg, s_avg, mkr+'k', label='measured, {}'.format(titlestr))
-    plt.plot(h_avg, s_fit, mkr+'r', label='best fit, {}'.format(titlestr))
-    plt.xlabel('h (mm)')
-    plt.ylabel('s (mm)')
+    plt.figure(dpi=200)
+    plt.xlabel('$h$ (mm)')
+    plt.ylabel('$s$ (mm)')
+    plt.xlim([0.0,2.0])      
+    #plt.plot(h_avg, s_avg, 'or', label='measured, {}'.format(titlestr))
+    plt.plot(h_avg, s_fit, 'ok', label='best fit, {}'.format(titlestr))
+    plt.plot(h_range, s_model, 'k', label='quadratic fit $s = {0:.3f}h^2$'.format(b_fit[0]))
     plt.legend()
+
+    if saveFlag:
+        filename = 'r-const_arclengthfit'
+        plt.savefig(os.path.join(figdir,"{0}.png".format(filename)),dpi=200)
+        plt.savefig(os.path.join(figdir,"{0}.svg".format(filename)))   
     
-    # update value
+    # Update value
     dtheta_model_update = np.zeros((3,len(T_range)))
     if 'h' not in titlestr:
         for i in range(3):
             h_val = h_avg[i]
             r_val = r_avg[i]
             s_val = s_avg[i]
-            bilayer = BilayerModel(h_val*1e-3, r_val, b=b_fit, T=24.3,
+            bilayer = BilayerModel(h_val*1e-3, r_val, b=b_fit, bFlag='quad', T=24.3,
                                    LCE_modulus_params=LCE_modulus_params)
             theta0 = bilayer.thetaT
             for j, T_val in enumerate(T_range):
@@ -617,15 +645,19 @@ def analyze_bending_angles(datapath, parampath,
     plt.figure(dpi=200)
     plt.title(titlestr)
     plt.xlabel("Temperature ($^\circ$C)")
-    plt.ylabel("Change in angle from RT ($^\circ$)")
+    plt.ylabel(r"Change in angle $\theta_T$ from RT ($^\circ$)")
     letters = ['A','B','C']
     labels = ['{0}: h={1:.2f}, r={2:.2f}'.format(letters[i],h_avg[i],r_avg[i]) for i in range(3)]
     colors = ['r','g','b']
     markers = ['o','^']
     for i in range(3):
         plt.errorbar(T, dtheta_avg[i,:], fmt=colors[i]+markers[0], yerr=dtheta_std[i,:], capsize=4, label=labels[i])
-        plt.plot(T_range, dtheta_model_update[i,:], colors[i], linestyle='--')
+        plt.plot(T_range, dtheta_model_update[i,:], colors[i], linestyle='--', label='model: '+labels[i])
     plt.legend()
+    if saveFlag:
+        filename = 'r-const_angle'
+        plt.savefig(os.path.join(figdir,"{0}.png".format(filename)),dpi=200)
+        plt.savefig(os.path.join(figdir,"{0}.svg".format(filename)))   
     
     if 'h' in titlestr:
         return None

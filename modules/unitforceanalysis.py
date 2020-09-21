@@ -73,7 +73,7 @@ def import_rconst_data(sourcedir, bilayerDict={}, setStartLoadToZero=False):
 
     return r_avg, ucdf
 
-def analyze_rconst_nomagnets(ucdf):
+def analyze_rconst_nomagnets(ucdf, bilayerDict):
     ''' Analysis of just no-magnet case: find best-fit square stiffness ksq (in
         series with hinge stiffness kq) '''
     
@@ -85,8 +85,9 @@ def analyze_rconst_nomagnets(ucdf):
     for index, row in ucdf_N.iterrows():
         unitData = row["data"]
         unitModel = metamat.MetamaterialModel(unitData.h, unitData.r, ANGLE_NEAR_ZERO,
-                                              T=unitData.T, d=unitData.d, s=unitData.s, 
-                                              hasMagnets=bool(unitData.magnets))
+                                              T=unitData.T, d=unitData.d,
+                                              hasMagnets=bool(unitData.magnets),
+                                              **bilayerDict)
 
         # Use subset of load-disp data before collision begins to fit k_q
         maxStrain = 0.225
@@ -104,11 +105,11 @@ def analyze_rconst_nomagnets(ucdf):
     
     return k_sq_fit
 
-def analyze_rconst_moment(ucdf, k_sq_fit):
+def analyze_rconst_moment(ucdf, k_sq_fit, bilayerDict):
     ''' Analysis of just with-magnet case: find best-fit magnetic moment m '''
     ucdf_Y = ucdf.loc[ucdf["magnets"] == 1]  
 
-    p_guess = 0.14
+    p_guess = 0.20
     
     # Find individual best-fit values for k_q
     p_fit_moment_individual = np.zeros(len(ucdf_Y))
@@ -116,12 +117,13 @@ def analyze_rconst_moment(ucdf, k_sq_fit):
     for index, row in ucdf_Y.iterrows():
         unitData = row["data"]
         unitModel = metamat.MetamaterialModel(unitData.h, unitData.r, ANGLE_NEAR_ZERO,
-                                              T=unitData.T, d=unitData.d, s=unitData.s,
+                                              T=unitData.T, d=unitData.d,
                                               k_sq=k_sq_fit,
-                                              hasMagnets=0) # Using this only for k_eq
+                                              hasMagnets=0,
+                                              **bilayerDict) # Using this only for k_eq
 
         # Use subset of load-disp data before collision begins to fit moment
-        maxStrain = 0.175
+        maxStrain = 0.200#0.175
         maxIndex = np.where(unitData.strain < maxStrain)[0][-1]
         p_given = [unitModel.total_angle, unitModel.k_eq, unitData.d/2]
 
@@ -136,24 +138,25 @@ def analyze_rconst_moment(ucdf, k_sq_fit):
     
     return moment_fit
 
-def analyze_rconst_collision(ucdf, k_sq_fit, moment_fit):
+def analyze_rconst_collision(ucdf, k_sq_fit, moment_fit, bilayerDict):
     ''' Analysis of just with-magnet case: find best-fit collision parameters
         (A, B) for exponential fit'''
     ucdf_Y = ucdf.loc[ucdf["magnets"] == 1]  
     
-    p_fit_all = fit_constant_collision(ucdf_Y, [k_sq_fit, moment_fit])
+    p_fit_all = fit_constant_collision(ucdf_Y, [k_sq_fit, moment_fit, bilayerDict])
     p_lim_fit = p_fit_all.x
     
     return p_lim_fit
 
-def analyze_rconst_moment_and_collision(ucdf, k_sq_fit, p_guess=[0.18,np.radians(44),1],
+def analyze_rconst_moment_and_collision(ucdf, k_sq_fit, bilayerDict, p_guess=[0.18,np.radians(44),1],
                                         limFlag='pcw', weightMagnitude=1):
     ''' Using curve fitting weighted to best match roots of load-displacement,
         find best-fit magnetic moment and collision parameters '''
     
     ucdf_Y = ucdf.loc[ucdf["magnets"] == 1]     
     p_fit = fit_constant_magnet_and_collision(ucdf_Y, k_sq_fit, p_guess=p_guess,
-                                              limFlag=limFlag, weightMagnitude=1)
+                                              limFlag=limFlag, weightMagnitude=1,
+                                              bilayerDict=bilayerDict)
     moment_fit = p_fit[0]
     p_lim_fit = p_fit[1], p_fit[2]
     
@@ -237,7 +240,7 @@ def residue_constant_collision(p, ucdf, params_given, limFlag='exp'):
     ''' Cost function: minimize difference between constant collision parameters
         and best-fit collision parameters, for all force-displacement relations '''
 
-    k_sq_fit, m_fit = params_given
+    k_sq_fit, m_fit, bilayerDict = params_given
 
     # Find individual best-fit values for k_q
     nSamples = len(ucdf)
@@ -246,11 +249,12 @@ def residue_constant_collision(p, ucdf, params_given, limFlag='exp'):
     for index, row in ucdf.iterrows():
         unitData = row["data"]
         unitModel = metamat.MetamaterialModel(unitData.h, unitData.r, ANGLE_NEAR_ZERO,
-                                              T=unitData.T, d=unitData.d, s=unitData.s, 
+                                              T=unitData.T, d=unitData.d, 
                                               k_sq=k_sq_fit, p_lim=p, limFlag=limFlag,
                                               m = m_fit,
                                               hasMagnets=bool(unitData.magnets),
-                                              analysisFlag=False) # Using only for k_eq
+                                              analysisFlag=False,
+                                              **bilayerDict)
 
         # Use subset of load-disp data before collision begins to fit moment
         p_given = [unitModel.total_angle, unitModel.k_eq, unitData.d/2, m_fit]
@@ -346,7 +350,8 @@ def add_weights_at_roots(unitData, weightMagnitude=1, windowSize=1):
 
 def fit_constant_magnet_and_collision(ucdf, p_given, 
                                       p_guess=[0.18, 3e-10, 18],
-                                      limFlag='exp', weightMagnitude=1):
+                                      limFlag='exp', weightMagnitude=1, 
+                                      bilayerDict={}):
     ''' Takes dataframe containing all non-magnet samples and returns the 
         square stiffness and collision parameters which minimizes the
         least-squares error for all fit '''
@@ -377,7 +382,7 @@ def fit_constant_magnet_and_collision(ucdf, p_given,
     # Do the fitting!
     p_fit = opt.least_squares(residue_constant_magnet_and_collision, p_guess,
                               args=(ucdf, p_given, all_weights),
-                              kwargs={'limFlag':limFlag})
+                              kwargs={'limFlag':limFlag, 'bilayerDict':bilayerDict})
     p_fit = p_fit.x
     m_fit = p_fit[0]
     p_lim_fit = [p_fit[1], p_fit[2]]
@@ -398,22 +403,22 @@ def fit_constant_magnet_and_collision(ucdf, p_given,
         for i in all_indices[count]:
             plt.plot(disp_plt[i], 0, 'gx')
         unitModel = metamat.MetamaterialModel(unitData.h, unitData.r, ANGLE_NEAR_ZERO,
-                                              T=unitData.T, d=unitData.d, s=unitData.s,
+                                              T=unitData.T, d=unitData.d, 
                                               k_sq=k_sq_fit, m=m_fit, p_lim=p_lim_fit,
-                                              limFlag=limFlag,
-                                              hasMagnets=1, analysisFlag=False) # Using this only for k_eq
+                                              limFlag=limFlag, hasMagnets=1, analysisFlag=False,
+                                              **bilayerDict) # Using this only for k_eq
         plt.plot(disp_plt, unitModel.model_load_disp(unitData.disp), 'r', label="model")
         modelIndices, _ = find_zero_crossings(unitModel.model_load_disp(unitData.disp), startSign=1)
-        print(modelIndices)
+        #print(modelIndices)
         for j in modelIndices:
-            print(disp_plt[int(j)])
+            #print(disp_plt[int(j)])
             plt.plot(disp_plt[int(j)], 0, 'bo')
         count += 1
     
     return p_fit
 
 def residue_constant_magnet_and_collision(p, ucdf, params_given, all_weights,
-                                          limFlag='exp'):
+                                          limFlag='exp', bilayerDict={}):
     ''' Cost function: minimize difference between constant collision parameters
         and best-fit collision parameters, for all force-displacement relations '''
 
@@ -427,13 +432,14 @@ def residue_constant_magnet_and_collision(p, ucdf, params_given, all_weights,
     count = 0
     for index, row in ucdf.iterrows():
         unitData = row["data"]
-        print(unitData.label)
+        #print(unitData.label)
         unitModel = metamat.MetamaterialModel(unitData.h, unitData.r, ANGLE_NEAR_ZERO,
-                                              T=unitData.T, d=unitData.d, s=unitData.s, 
+                                              T=unitData.T, d=unitData.d, 
                                               k_sq=k_sq_fit, m=m_guess, 
                                               p_lim=p_lim_guess, limFlag=limFlag,
                                               hasMagnets=bool(unitData.magnets),
-                                              analysisFlag=False) # Using only for k_eq
+                                              analysisFlag=False,
+                                              **bilayerDict) # Using only for k_eq
 
         # Use subset of load-disp data before collision begins to fit moment
         p_given = [unitModel.total_angle, unitModel.k_eq, unitData.d/2, limFlag]
@@ -462,32 +468,36 @@ def residue_constant_magnet_and_collision(p, ucdf, params_given, all_weights,
     return residual
 
 
-def plot_final_rconst_fit(ucdf, k_sq_fit, m_fit, p_lim_fit, limFlag='exp'):
-    for index, row in ucdf.iterrows():
+def plot_final_rconst_fit(ucdf, k_sq_fit, m_fit, p_lim_fit, bilayerDict, limFlag='exp'):
+    ''' Plot force-displacement curves for experiment data and best fit for all data,
+        including markers at roots'''
+    
+    ucdf_Y = ucdf.loc[ucdf["magnets"] == 1] 
+    for index, row in ucdf_Y.iterrows():
         unitData = row["data"]
         plt.figure(dpi=200)
         plt.xlabel("Strain, $\delta/d$")
         plt.ylabel("Load (N)")
         plt.title(unitData.label)
-        disp_plt = unitData.strain
         
+        # Plot experiment and model curves
+        disp_plt = unitData.strain        
         plt.plot(disp_plt, unitData.load, 'k', label="experiment")
-        dataIndices, _ = find_zero_crossings(unitData.load, startSign=1)
-        for i in dataIndices:
-            plt.plot(disp_plt[i], 0, 'gx')
         unitModel = metamat.MetamaterialModel(unitData.h, unitData.r, ANGLE_NEAR_ZERO,
-                                              T=unitData.T, d=unitData.d, s=unitData.s,
+                                              T=unitData.T, d=unitData.d,
                                               k_sq=k_sq_fit, m=m_fit, p_lim=p_lim_fit,
                                               limFlag=limFlag,
-                                              hasMagnets=bool(unitData.magnets), analysisFlag=False)
+                                              hasMagnets=bool(unitData.magnets), analysisFlag=False,
+                                              **bilayerDict)
         plt.plot(disp_plt, unitModel.model_load_disp(unitData.disp), 'r', label="model")
+        
+        # Plot experiment and model roots
+        dataIndices, _ = find_zero_crossings(unitData.load, startSign=1)
+        for i in dataIndices:
+            plt.plot(disp_plt[i], 0, 'ko', fillstyle='none', label='roots of experiment')
         modelIndices, _ = find_zero_crossings(unitModel.model_load_disp(unitData.disp), startSign=1)
-        print(modelIndices)
-        print(len(disp_plt))
-        print(len(unitData.disp))
         for j in modelIndices:
-            print(disp_plt[int(j)])
-            plt.plot(disp_plt[int(j)], 0, 'bx') 
+            plt.plot(disp_plt[int(j)], 0, 'rx', label='roots of model') 
         
         plt.legend()
         

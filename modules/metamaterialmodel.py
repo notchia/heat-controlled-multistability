@@ -24,7 +24,7 @@ class MetamaterialModel:
     def __init__(self, h_total, ratio, thetaL, T=25.0,
                  LCE_strain_params=[0.039457,142.37,6.442e-3],
                  LCE_modulus_params=[-8.43924097e-02,2.16846882e+02,3.13370660e+05],
-                 d=0.018, w=0.010, b=[], s=0, m=0.1471,
+                 d=0.018, w=0.010, b=[], s=0, m=0.1471, bFlag='lin',
                  limFlag='exp', p_lim=[3e-22, 51], k_sq=0.0,
                  plotFlag=False, verboseFlag=False, loadFlag=False, hasMagnets=True,
                  analysisFlag=True):
@@ -40,7 +40,7 @@ class MetamaterialModel:
         self.hinge = bilayer.BilayerModel(h_total, ratio, T=T, 
                                           LCE_strain_params=LCE_strain_params,
                                           LCE_modulus_params=LCE_modulus_params,
-                                          w=w, b=b, s=s)
+                                          w=w, b=b, bFlag=bFlag, s=s)
         self.total_angle = self.hinge.thetaT + self.thetaL # total equilibrium angle (sum of fabrication and temperature contributions)
         
         # Geometric parameterss
@@ -322,7 +322,8 @@ class MetamaterialModel:
 def analyze_composite_phases(r, h_range=1e-3*np.arange(0.5,2.1,0.01),
                              thetaL_range=np.radians(np.arange(-15.0,15.1,0.1)),
                              T_range=np.arange(25.0,75.1,25.0),
-                             b=[0,1.50], k_sq=0.0, m=0.1471, limFlag='exp', p_lim=[3e-22, 51]):
+                             b=[], k_sq=0.0, m=0.1471, limFlag='exp', p_lim=[3e-22, 51],
+                             bilayerDict={}):
     ''' For a given composite with ratio r, compute number of minima across isotherms '''
     n_h = len(h_range)
     n_L = len(thetaL_range)
@@ -339,7 +340,7 @@ def analyze_composite_phases(r, h_range=1e-3*np.arange(0.5,2.1,0.01),
         h = h_range[i_h]
         for i_L in range(n_L):
             thetaL = thetaL_range[i_L]
-            sample = MetamaterialModel(h, r, thetaL, T=25.0, b=b, k_sq=k_sq)
+            sample = MetamaterialModel(h, r, thetaL, T=25.0, k_sq=k_sq, m=m, p_lim=p_lim, **bilayerDict)
             for i_T in range(n_T):
                 sample.update_T(T_range[i_T])              
                 
@@ -354,7 +355,8 @@ def analyze_composites(r_range=np.arange(0.1,0.95,0.1),
                        h_range=1e-3*np.arange(0.5,2.1,0.01),
                        thetaL_range=np.radians(np.arange(-15.0,15.1,0.1)),
                        T_range=np.arange(25.0,105.0,25.0),
-                       b=[0,1.50], k_sq=0.0, m=0.1471, limFlag='exp', p_lim=[3e-22, 51],
+                       b=[], k_sq=0.0, m=0.1471, limFlag='exp', p_lim=[3e-22, 51],
+                       bilayerDict={},
                        savedir=''):
     ''' FULL PHASE ANALYSIS '''
     
@@ -365,7 +367,7 @@ def analyze_composites(r_range=np.arange(0.1,0.95,0.1),
         #sys.stdout.write("\rMapping parameter space: analyzing {0}/{1} composites at {2:.2f} hours".format(i+1, len(r_range), (time.perf_counter()-t0)/3600.0))
         #sys.stdout.flush()
         numMin, phases, thetaT, theta0 = analyze_composite_phases(r, h_range=h_range, thetaL_range=thetaL_range, T_range=T_range,
-                                                                  b=b, k_sq=k_sq, m=m, limFlag=limFlag, p_lim=p_lim)
+                                                                  b=b, k_sq=k_sq, m=m, limFlag=limFlag, p_lim=p_lim, bilayerDict=bilayerDict)
         for T in T_range:
             plot_isotherm(r, T, phases, theta0, h_range=h_range, thetaL_range=thetaL_range, T_range=T_range, savedir=savedir)
 

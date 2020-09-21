@@ -73,14 +73,7 @@ def fit_PDMS_tensile(sourcedir, verboseFlag=False, saveFlag=True, figdir=''):
             Y_vals.append(Young)
     
             print('PDMS Young\'s modulus @ {1:.1f}C: {0:.2f}MPa'.format(1e-6*Young, temperature))
-    
-    #modulus_avg = np.mean(np.array(Y_vals))
-    #modulus_std = np.std(np.array(Y_vals))
-    
-    # Add these values to LCE_modulus plot (created by fit_LCE_modulus)
-    
-    print(Y_vals)
-    
+       
     plt.figure('PDMS_modulus')
     plt.plot(T_vals, [1e-6*Y for Y in Y_vals], '*k', markersize='12', label='Young\'s modulus (tensile)')
     plt.tight_layout()

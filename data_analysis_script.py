@@ -6,7 +6,6 @@ Run all analyses required to generate results for ACS-AMI paper
 """
 
 import numpy as np
-import matplotlib.pyplot as plt
 import os
 
 import modules.pltformat # No functions, just formatting
@@ -50,20 +49,22 @@ if __name__ == "__main__":
     fname_strain = "ImageJ_measurements_31.5014mm2px.csv"
     fname_modulus = "200901_LCE_DMA_2.txt"#"200820_LCE_DMA.txt"
     strainParams, strainModel = lce.fit_LCE_strain(os.path.join(sourcedir, "LCE_contraction/"+fname_strain),
-                                                       saveFlag=SAVE_FLAG, figdir=savedir)
+                                                   saveFlag=SAVE_FLAG, figdir=savedir)
     #modulusParams, modulusModel = lce.fit_LCE_modulus(os.path.join(sourcedir, fname_modulus))
-    modulusParams, modulusModel = lce.fit_LCE_modulus_avg(os.path.join(sourcedir, "LCE_DMA"))
+    modulusParams, modulusModel = lce.fit_LCE_modulus_avg(os.path.join(sourcedir, "LCE_DMA"),
+                                                          verboseFlag=VERBOSE_FLAG)
     lce.fit_LCE_tensile(os.path.join(sourcedir, "LCE_tensile"),
                         saveFlag=SAVE_FLAG, figdir=savedir)
     
     #%% Get magnetic moment and check temperature degradation 
-    section_header('LCE')
+    section_header('magnet')
     sourcedir = os.path.join(rawdir, "magnet_properties")
-    moment = magnet.fit_magnet_forces(sourcedir, zeroDisp=9.20,
+    moment = magnet.fit_magnet_forces(os.path.join(sourcedir, "moment"),
+                                      zeroDisp=9.20,
                                       saveFlag=SAVE_FLAG, figdir=savedir)
-    sourcedir = os.path.join(sourcedir, "temperature_degradation")
-    magnet.determine_temp_dependence(sourcedir, zeroDisp=7.85,
-                              saveFlag=SAVE_FLAG, figdir=savedir)    
+    if VERBOSE_FLAG:
+        magnet.determine_temp_dependence(os.path.join(sourcedir, "temperature_degradation"),
+                                         zeroDisp=7.85, saveFlag=SAVE_FLAG, figdir=savedir)    
     
     #%% Run analysis on bilayer beams
     section_header('bilayer')
@@ -71,10 +72,11 @@ if __name__ == "__main__":
     datafile = os.path.join(sourcedir, "200819_bilayer_ImageJ_curvature.csv")
     paramfile = os.path.join(sourcedir, "200819_bilayer_parameters.csv")
     hinge.analyze_data_200819(paramfile, datafile, LCE_modulus_params=modulusParams, 
-                              saveFlag=SAVE_FLAG, figdir=savedir)  
-    #for b in np.arange(0.5, 2.1, 0.5):
-    #    hinge.analyze_angle_change_with_temp(LCE_modulus_params=modulusParams, b=[0.0,b],
-    #                                         saveFlag=SAVE_FLAG, figdir=tmpdir)         
+                              LCE_strain_params=strainParams, 
+                              saveFlag=SAVE_FLAG, figdir=savedir, verboseFlag=VERBOSE_FLAG)  
+    hinge.analyze_curvature_change_with_temp(LCE_modulus_params=modulusParams,
+                                             LCE_strain_params=strainParams, 
+                                             saveFlag=SAVE_FLAG, figdir=savedir, verboseFlag=VERBOSE_FLAG)
 
     #%% Run analysis on bending angles
     section_header('unit cell angles')
@@ -84,64 +86,69 @@ if __name__ == "__main__":
     datafile = os.path.join(sourcedir, "rconst_angles_ImageJ.csv")
     paramfile = os.path.join(sourcedir, "rconst_parameters.csv")
     b_fit = hinge.analyze_bending_angles(datafile, paramfile,
-                           LCE_modulus_params=modulusParams, titlestr='fixed r')
+                           LCE_modulus_params=modulusParams,
+                           LCE_strain_params=strainParams, titlestr='fixed r',
+                           saveFlag=SAVE_FLAG, figdir=savedir)
     print("b_fit: {0}".format(b_fit))
-    print("constant h:")
-    datafile = os.path.join(sourcedir, "hconst_angles_ImageJ.csv")
-    paramfile = os.path.join(sourcedir, "hconst_parameters.csv")
-    hinge.analyze_bending_angles(datafile, paramfile,
-                                         LCE_modulus_params=modulusParams, titlestr='fixed h')
+#    print("constant h:")
+#    datafile = os.path.join(sourcedir, "hconst_angles_ImageJ.csv")
+#    paramfile = os.path.join(sourcedir, "hconst_parameters.csv")
+#    hinge.analyze_bending_angles(datafile, paramfile,
+#                                 LCE_modulus_params=modulusParams,
+#                                 LCE_strain_params=strainParams, titlestr='fixed h')
 
     #%% Run analysis on force-displacement data
     bilayerDict = {"LCE_modulus_params":modulusParams,
                    "LCE_strain_params":strainParams,
-                   "b":b_fit}
+                   "b":b_fit,
+                   "bFlag":'quad'}
 
     section_header('unit cell forces')
     sourcedir = os.path.join(rawdir,"unitCell_properties/unitCell_tension_rconst")
-
-    r_avg, ucdf = force.import_rconst_data(sourcedir, #setStartLoadToZero=True,
-                                           bilayerDict)
-    ksq_fit = force.analyze_rconst_nomagnets(ucdf)
+    r_avg, ucdf = force.import_rconst_data(sourcedir, bilayerDict)
+    
+    ksq_fit = force.analyze_rconst_nomagnets(ucdf, bilayerDict)
     print("k_sq_fit: {0}".format(ksq_fit))
 
     #%%
+    # CURRENTLY THIS DOES NOT WORK. run the next cell instead
     limFlag='exp'
     p_guess = [0.18,3e-10, 18]
-    weightMagnitude =1.0# 0.5
+    weightMagnitude = 1.0# 0.5
     moment_fit, p_lim_fit = force.analyze_rconst_moment_and_collision(ucdf, ksq_fit,
+                                                                      bilayerDict,
                                                                       p_guess=p_guess,
                                                                       limFlag=limFlag, 
                                                                       weightMagnitude=weightMagnitude)
     print("m_fit: {0}".format(moment_fit))
     print("p_lim_fit: {0}".format(p_lim_fit))
+    
     #%%    
-    moment_fit = force.analyze_rconst_moment(ucdf, ksq_fit)
+    moment_fit = force.analyze_rconst_moment(ucdf, ksq_fit, bilayerDict)
     print("m_fit: {0}".format(moment_fit))
-    p_lim_fit = force.analyze_rconst_collision(ucdf, ksq_fit, moment_fit)
+    p_lim_fit = force.analyze_rconst_collision(ucdf, ksq_fit, moment_fit, bilayerDict)
     print("p_lim_fit: {0}".format(p_lim_fit))
-    #%%
+    
+    #%% Plot resulting best-fit curve
+    # Commented out are the best-fit parameters found once upon a time...
     """
     ksq_fit = 0.005765489237871801
     moment_fit = 0.1897092016810536
     p_lim_fit = [1.77252756e-10, 1.91067338e+01]"""
-    #%%
-    force.plot_final_rconst_fit(ucdf, ksq_fit, moment_fit, p_lim_fit, limFlag=limFlag)
+    force.plot_final_rconst_fit(ucdf, ksq_fit, moment_fit, p_lim_fit, bilayerDict, limFlag=limFlag)
 
-    #%% Run phase diagram generation
-    
-    #b_fit=[0,1.5] # To alleviate numerical troubles
-    
+    #%% Run phase diagram generation   
     section_header('phase diagrams')    
     r_range = np.array([r_avg]) #r_const average value
     h_range = 1e-3*np.arange(0.7,2.1,0.01)
     thetaL_range = np.radians(np.arange(-15.0,15.1,0.1))
-    T_range = np.array([25.0])#, 45.0, 78.0])#np.arange(25.0,105.0,5.0)
+    T_range = np.array([25.0, 45.0, 78.0])#np.arange(25.0,105.0,5.0)
     unit.analyze_composites(r_range=r_range,
                             h_range=h_range,
                             thetaL_range=thetaL_range,
                             T_range=T_range,
-                            b=b_fit, k_sq=ksq_fit, m=moment_fit, p_lim=p_lim_fit,
+                            k_sq=ksq_fit, m=moment_fit, p_lim=p_lim_fit,
+                            bilayerDict=bilayerDict,
                             #limFlag=limFlag,
                             savedir=tmpdir) 
     

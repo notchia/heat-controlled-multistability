@@ -29,8 +29,8 @@ def model_force (d, m):
     return F
 
 
-# Import and analyze experiments relating to this model -----------------------
-def fit_magnet_force(filename, zeroDisp=0, speed=1, figFlag=False, saveFlag=False, figdir='', filterFlag=False):
+def fit_magnet_force(filename, zeroDisp=0, speed=1, filterFlag=False,
+                     figFlag=False, saveFlag=False, figdir='', ):
     ''' Fit cycles of force-displacement data to dipole model.  
         Check that the optional parameter values are correct for the test: 
             zeroDisp:   [mm] true distance between centers of squares at zero
@@ -38,8 +38,6 @@ def fit_magnet_force(filename, zeroDisp=0, speed=1, figFlag=False, saveFlag=Fals
             speed:      [mm/s] test speed
     '''
     
-
-
     # Import data; split multicycle array into tension and compression for each
     cols = [0,1,4] #time, load, cycle number
     arr = np.genfromtxt(filename,dtype=float,delimiter=',',skip_header=17,usecols=cols)
@@ -75,8 +73,10 @@ def fit_magnet_force(filename, zeroDisp=0, speed=1, figFlag=False, saveFlag=Fals
     return params, model_force
 
 def fit_magnet_forces(sourcedir, zeroDisp=0, saveFlag=False, figdir=''):
+    ''' Fit magnetic moment (assuming point dipoles) to all data in source
+        directory, then find and return average of these '''
     filelist = os.listdir(sourcedir)
-    nT = len(filelist)
+    #nT = len(filelist)
     m_list = []
     for i, fname in enumerate(filelist):
         if os.path.splitext(fname)[-1] == '.csv':
@@ -109,7 +109,6 @@ def determine_temp_dependence(sourcedir, zeroDisp=0, saveFlag=False, figdir=''):
         T[i] = int(temp.strip('C'))
         params, model = fit_magnet_force(fullpath, zeroDisp=zeroDisp)
         m[i] = params[0]
-        plt.title('$T$ = {0}$^\circ$C'.format(T[i]))
  
     plt.figure('magnet_temperature_test',dpi=200)
     plt.title("Magnetic strength degradation")
