@@ -13,6 +13,8 @@ from datetime import datetime
 import os
 import sys
 import matplotlib.colors as col
+from matplotlib import cm
+
 
 from modules import bilayermodel as bilayer
 
@@ -87,6 +89,10 @@ class MetamaterialModel:
         M = 4*(M_k + M_m + M_lim)
         F = -M/(self.d*np.cos(q))
         return F
+
+    def model_energy(self, q_range=np.radians(np.arange(-50.0,50.5,0.5))):
+        energy = self._calculate_total_energy(q_range)
+        return energy, q_range
 
     # Forces and torques, for comparison to experimental data -----------------
     def _rot2disp(self, q):
@@ -218,7 +224,7 @@ class MetamaterialModel:
         
         q = np.degrees(q)
         
-        plt.figure()
+        plt.figure(dpi=300)
         plt.title(r"$h$={0}mm, $r$={1}, $\theta_L$={2:0.1f}$^\circ$ @ $T$={3}$^\circ$C".format(self.h_total, self.ratio, np.degrees(self.thetaL), int(self.T)))
         plt.xlabel(r"Angle $\theta$ (degrees)")
         plt.ylabel("Energy (J)")        
@@ -226,9 +232,9 @@ class MetamaterialModel:
         if U_m.any():
             plt.plot(q, U_m, 'b--', label="Magnet")
         if U_k.any():
-            plt.plot(q, U_k, 'r--', label="Beam")
+            plt.plot(q, U_k, 'r--', label="Spring")
         if U_lim.any():
-            plt.plot(q, U_lim, 'g--', label="Limit")
+            plt.plot(q, U_lim, 'g--', label="Collision")
         plt.plot(q, U_total, 'k', label="Total")
         
         minima = signal.argrelmin(U_total)[0]
@@ -242,12 +248,13 @@ class MetamaterialModel:
         maxU.sort()
         if maxU.size > 0:
             plt.ylim(minU[0]-0.0001, maxU[-1]+0.0001)
+        plt.ylim(-0.0015,0.001)
         
         if (U_m.any() or U_k.any() or U_lim.any()):
             plt.legend()
         plt.tight_layout()
-        plt.savefig('h{0:.2f}_r{1:.2f}_L{2:0.1f}_T{3:.1f}.png'.format(self.h_total, self.ratio, np.degrees(self.thetaL), int(self.T)))
-        plt.close()
+        #plt.savefig('h{0:.2f}_r{1:.2f}_L{2:0.1f}_T{3:.1f}.png'.format(self.h_total, self.ratio, np.degrees(self.thetaL), int(self.T)))
+        #plt.close()
         
         return
     
@@ -357,7 +364,7 @@ def analyze_composites(r_range=np.arange(0.1,0.95,0.1),
                        T_range=np.arange(25.0,105.0,25.0),
                        b=[], k_sq=0.0, m=0.1471, limFlag='exp', p_lim=[3e-22, 51],
                        bilayerDict={},
-                       savedir=''):
+                       savedir='', closeFlag=True):
     ''' FULL PHASE ANALYSIS '''
     
     datestr = datetime.today().strftime('%Y%m%d')
@@ -369,12 +376,13 @@ def analyze_composites(r_range=np.arange(0.1,0.95,0.1),
         numMin, phases, thetaT, theta0 = analyze_composite_phases(r, h_range=h_range, thetaL_range=thetaL_range, T_range=T_range,
                                                                   b=b, k_sq=k_sq, m=m, limFlag=limFlag, p_lim=p_lim, bilayerDict=bilayerDict)
         for T in T_range:
-            plot_isotherm(r, T, phases, theta0, h_range=h_range, thetaL_range=thetaL_range, T_range=T_range, savedir=savedir)
+            plot_isotherm(r, T, phases, theta0, h_range=h_range, thetaL_range=thetaL_range,
+                          T_range=T_range, savedir=savedir, closeFlag=closeFlag)
 
-        minima_file = os.path.join(savedir, '{0}_r{1}_minima.npy'.format(datestr, r))
-        phases_file = os.path.join(savedir, '{0}_r{1}_phases.npy'.format(datestr, r))
-        thetaT_file = os.path.join(savedir, '{0}_r{1}_thetaT.npy'.format(datestr, r))
-        theta0_file = os.path.join(savedir, '{0}_r{1}_theta0.npy'.format(datestr, r))
+        minima_file = os.path.join(savedir, '{0}_r{1:.3f}_minima.npy'.format(datestr, r))
+        phases_file = os.path.join(savedir, '{0}_r{1:.3f}_phases.npy'.format(datestr, r))
+        thetaT_file = os.path.join(savedir, '{0}_r{1:.3f}_thetaT.npy'.format(datestr, r))
+        theta0_file = os.path.join(savedir, '{0}_r{1:.3f}_theta0.npy'.format(datestr, r))
 
         np.save(minima_file, numMin, allow_pickle=False)
         np.save(phases_file, phases, allow_pickle=False)
@@ -382,6 +390,112 @@ def analyze_composites(r_range=np.arange(0.1,0.95,0.1),
         np.save(theta0_file, theta0, allow_pickle=False)
     export_parameters(os.path.join(savedir, '{0}_analysis_parameters.npy'.format(datestr)),
                       thetaL_range, T_range, h_range, r_range)
+
+
+def analyze_h_T_relation(r, h_range=1e-3*np.arange(0.5,2.1,0.001),
+                             thetaL=0.0,
+                             T_range=np.arange(20.0,100.1,1.0),
+                             k_sq=0.0, m=0.1471, limFlag='exp', p_lim=[3e-22, 51],
+                             bilayerDict={},
+                             saveFlag=False, figdir=''):
+    ''' For a given composite with ratio r, compute number of minima across isotherms '''
+    n_h = len(h_range)
+    n_T = len(T_range)
+    angleT_array = np.zeros((n_h, n_T))
+    angle0_array = np.zeros((n_h, n_T))
+    numMin_array = np.zeros((n_h, n_T))
+    phases_array = np.zeros((n_h, n_T))
+
+    t0 = time.perf_counter()
+    for i_h in range(n_h):
+        sys.stdout.write("\rMapping parameter space: analyzing {0}/{1} h values at {2:0.1f} minutes".format(i_h + 1, n_h, (time.perf_counter()-t0)/60.0))
+        sys.stdout.flush()
+        h = h_range[i_h]
+        sample = MetamaterialModel(h, r, thetaL, T=25.0, k_sq=k_sq, m=m, p_lim=p_lim, **bilayerDict)
+        for i_T in range(n_T):
+            sample.update_T(T_range[i_T])              
+            
+            numMin_array[i_h, i_T] = sample.numMin
+            phases_array[i_h, i_T] = sample.phases
+            angleT_array[i_h, i_T] = np.degrees(sample.hinge.thetaT)
+            angle0_array[i_h, i_T] = np.degrees(sample.total_angle)
+                    
+    # Plot
+    colors = ['xkcd:light red', 'xkcd:apple green', 'xkcd:apple green', 'xkcd:apple green', 'xkcd:electric blue', 'xkcd:blue purple', 'xkcd:electric blue']
+    title = 'h-T_r{1:0.2f}_thetaL{1:0.1f}'.format(r, np.degrees(thetaL))
+    fig = plt.figure(title, dpi=200)
+    plt.xlabel(r'hinge thickness $h$ (mm)')
+    plt.ylabel(r'Temperature ($^\circ$C)')
+    ax = fig.gca()
+
+    X = 1000*h_range
+    Y = T_range
+    Z = np.transpose(phases_array)
+    diagram = ax.imshow(Z, extent=[X.min(), X.max(), Y.min(), Y.max()],
+                        origin='lower', aspect='auto', cmap=col.ListedColormap(colors))           
+    
+    if saveFlag:
+        plt.savefig(os.path.join(figdir,"{0}.png".format(title)), dpi=200)
+        plt.savefig(os.path.join(figdir,"{0}.svg".format(title)), transparent=True)   
+    plt.close()
+
+def analyze_diagonal_dependence(h_val, ratio_val, thetaL_val,
+                                a_range=np.arange(0.010, 0.0255, 0.00005),
+                                T_range = np.arange(20.0, 100.1, 0.5),
+                                k_sq=0.0, m=0.1471, limFlag='exp', p_lim=[3e-22, 51],
+                                bilayerDict={},
+                                saveFlag=False, figdir=''):
+    ''' Map stability along three parameter axes: thickness, LCE:PDMS ratio, initial angle '''
+   
+    n_a = max(a_range.shape)
+    n_T = max(T_range.shape)
+    angleT_array = np.zeros((n_a,n_T))
+    angle0_array = np.zeros((n_a,n_T))
+    numMin_array = np.zeros((n_a,n_T))
+    phases_array = np.zeros((n_a,n_T))
+    
+    # Find minima
+    t0 = time.perf_counter()
+    for i_a in range(n_a):
+        sys.stdout.write("\rMapping parameter space: analyzing {0}/{1} h values at {2:0.1f} minutes".format(i_a + 1, n_a, (time.perf_counter()-t0)/60.0))
+        sys.stdout.flush()
+        sample = MetamaterialModel(h_val, ratio_val, thetaL_val,
+                                   T=25.0, k_sq=k_sq, m=m, p_lim=p_lim,
+                                   d=a_range[i_a],
+                                   **bilayerDict)
+        for i_T in range(n_T):
+            sample.update_T(T_range[i_T])
+            
+            numMin_array[i_a, i_T] = sample.numMin
+            phases_array[i_a, i_T] = sample.phases
+            angleT_array[i_a, i_T] = np.degrees(sample.hinge.thetaT)
+            angle0_array[i_a, i_T] = np.degrees(sample.total_angle)
+
+    # Plot
+    colors = ['xkcd:electric blue','xkcd:apple green','xkcd:light red']    
+    fig = plt.figure(dpi=200)
+    ax = fig.gca()
+    X = 1000*a_range
+    Y = T_range
+    Z = np.transpose(numMin_array)
+    diagram = ax.imshow((Z).astype(np.uint8), extent=[X.min(), X.max(), Y.min(), Y.max() ],
+                        origin='lower', aspect='auto', cmap=col.ListedColormap(colors))#cm.viridis          
+    
+    # Formatting
+    plt.title(r'$h$ = {0}, $\theta_0$ = {1}$^\circ$, $r$ = {2}'.format(h_val, thetaL_val, ratio_val))
+    plt.xlabel(r'Diagonal length $a$ (mm)')
+    plt.ylabel(r'Temperature $T$ ($^\circ$C)')
+    cbar = plt.colorbar(diagram)
+    cbar.ax.get_yaxis().set_ticks([])
+       
+    #plt.ylim([np.amin(angle0_vals), np.amax(angle0_vals)])
+    if saveFlag:
+        title = 'diagonal_dependence_h{0:.2f}_r{1:.2f}_thetaL{2:.1f}'.format(h_val, ratio_val, thetaL_val)
+        plt.savefig(os.path.join(figdir,'{0}.png'.format(title)),dpi=200)
+        plt.savefig(os.path.join(figdir,'{0}.svg'.format(title)))
+
+    return
+
 
 ''' Export parameters used to map parameter space '''
 def export_parameters(filename, thetaL, T, h, r):
@@ -480,7 +594,7 @@ def find_3D_phase_boundaries(r, h_range=1e-3*np.arange(0.5,2.1,0.01),
 def plot_isotherm(r, T, phases, angle0_vals,
                          h_range=1e-3*np.arange(0.5,2.1,0.01),
                          thetaL_range=np.radians(np.arange(-15.0,15.1,0.1)),
-                         T_range=np.arange(25.0,105.0,25.0), savedir=''):
+                         T_range=np.arange(25.0,105.0,25.0), savedir='', closeFlag=True):
     ''' Plot isotherm phase diagram for a given composite r: h vs total equilibrium angle
         at a particular temperature T'''
     
@@ -505,7 +619,8 @@ def plot_isotherm(r, T, phases, angle0_vals,
     if savedir != '':
         figname = 'isotherm_{0}C_r{1:0.2f}.png'.format(int(T), r)
         plt.savefig(os.path.join(savedir, figname),dpi=200)
-    plt.close()
+    if closeFlag:
+        plt.close()
 
     return
     
@@ -527,6 +642,39 @@ def test_MetamaterialModel(h_total, ratio, thetaL, T):
         
     return True
     
+def plot_energy_concept(h_total, ratio, thetaL, T_range, 
+                        b=[], k_sq=0.0, m=0.1471, limFlag='exp', p_lim=[3e-22, 51],
+                        bilayerDict={}, figdir=''):
+    
+    sample = MetamaterialModel(h_total=h_total, ratio=ratio, thetaL=thetaL, T=T_range[0],
+                               k_sq=k_sq, m=m, limFlag=limFlag, p_lim=p_lim,
+                               **bilayerDict)
+    
+    plt.figure(dpi=300)
+    plt.title(r"$h$={0}mm, $r$={1}, $\theta_L$={2:0.1f}$^\circ$".format(h_total, ratio, np.degrees(thetaL)))
+    plt.xlabel(r"Angle $\theta$ (degrees)")
+    plt.ylabel("Energy (J)")   
+    
+    q_range = np.radians(np.arange(-50.0,50.5,0.5))
+    q_deg = np.degrees(q_range)
+    colors = ['tab:orange','firebrick','yellowgreen','royalblue']
+    for i, T in enumerate(T_range):
+        sample.update_T(T)
+        U_total = sample._calculate_total_energy(q_range)
+        U_spring = sample._model_U_spring(q_range)
+        plt.plot(q_deg, U_total, '-', color=colors[i], label='Total, T={0}'.format(T))
+        plt.plot(q_deg, U_spring, '--', color=colors[i], label='Spring, T={0}'.format(T))
+        minima = signal.argrelmin(U_total)[0]
+        maxima = signal.argrelmax(U_total)[0]
+        minU = U_total[minima]
+        maxU = U_total[maxima]
+        plt.plot(q_deg[minima], minU, 'v', color=colors[i])
+        plt.plot(q_deg[maxima], maxU, '^', color=colors[i])
+   
+    plt.ylim(-0.0015,0.002)
+    plt.legend()
+    plt.savefig(os.path.join(figdir,'{0}.svg'.format('energy_concept')))
+
 #%%
     
 if __name__ == "__main__":
@@ -547,7 +695,7 @@ if __name__ == "__main__":
         theta0 = np.load(theta0_file)
         print("\tLoaded parameters, minima, phases, theta_T, and theta_0")
     except IOError:"""
-    print("\tRunning new parameter-space analysis...")    
+    '''print("\tRunning new parameter-space analysis...")    
     #r_range = np.arange(0.1,0.95,0.1)
     r_range = np.array([0.377]) #r_const average value
     h_range = 1e-3*np.arange(0.5,2.1,0.01)
@@ -557,6 +705,12 @@ if __name__ == "__main__":
                        h_range=h_range,
                        thetaL_range=thetaL_range,
                        T_range=T_range,
-                       savedir=tmpdir)
-    
+                       savedir=tmpdir)'''
+    h_val = 0.0007
+    r_val = 0.25
+    sample = MetamaterialModel(h_total=h_val, ratio=r_val, thetaL=0.0, T=25.0, b=[0.0,1.5],
+                           plotFlag=True, verboseFlag=True)
+    h_val = 0.0009
+    T_range = [25.0, 35.0, 50.0, 80.0]
+    plot_energy_concept(h_val, r_val, 0.0, T_range, figdir=tmpdir)
     

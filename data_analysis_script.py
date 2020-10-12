@@ -52,9 +52,9 @@ if __name__ == "__main__":
                                                    saveFlag=SAVE_FLAG, figdir=savedir)
     #modulusParams, modulusModel = lce.fit_LCE_modulus(os.path.join(sourcedir, fname_modulus))
     modulusParams, modulusModel = lce.fit_LCE_modulus_avg(os.path.join(sourcedir, "LCE_DMA"),
-                                                          verboseFlag=VERBOSE_FLAG)
-    lce.fit_LCE_tensile(os.path.join(sourcedir, "LCE_tensile"),
-                        saveFlag=SAVE_FLAG, figdir=savedir)
+                                                          verboseFlag=VERBOSE_FLAG, saveFlag=SAVE_FLAG, figdir=savedir)
+    #lce.fit_LCE_tensile(os.path.join(sourcedir, "LCE_tensile"),
+    #                    saveFlag=SAVE_FLAG, figdir=savedir)
     
     #%% Get magnetic moment and check temperature degradation 
     section_header('magnet')
@@ -97,13 +97,14 @@ if __name__ == "__main__":
 #                                 LCE_modulus_params=modulusParams,
 #                                 LCE_strain_params=strainParams, titlestr='fixed h')
 
-    #%% Run analysis on force-displacement data
+    #%% Run analysis on repeatability force-displacement data
     bilayerDict = {"LCE_modulus_params":modulusParams,
                    "LCE_strain_params":strainParams,
                    "b":b_fit,
                    "bFlag":'quad'}
 
-    section_header('unit cell forces')
+    #%% Run analysis on r-const force-displacement data
+    section_header('unit cell constant-r force')
     sourcedir = os.path.join(rawdir,"unitCell_properties/unitCell_tension_rconst")
     r_avg, ucdf = force.import_rconst_data(sourcedir, bilayerDict)
     
@@ -112,7 +113,9 @@ if __name__ == "__main__":
 
     #%%
     # CURRENTLY THIS DOES NOT WORK. run the next cell instead
+    
     limFlag='exp'
+    """
     p_guess = [0.18,3e-10, 18]
     weightMagnitude = 1.0# 0.5
     moment_fit, p_lim_fit = force.analyze_rconst_moment_and_collision(ucdf, ksq_fit,
@@ -122,20 +125,54 @@ if __name__ == "__main__":
                                                                       weightMagnitude=weightMagnitude)
     print("m_fit: {0}".format(moment_fit))
     print("p_lim_fit: {0}".format(p_lim_fit))
-    
+    """
     #%%    
     moment_fit = force.analyze_rconst_moment(ucdf, ksq_fit, bilayerDict)
     print("m_fit: {0}".format(moment_fit))
     p_lim_fit = force.analyze_rconst_collision(ucdf, ksq_fit, moment_fit, bilayerDict)
     print("p_lim_fit: {0}".format(p_lim_fit))
     
+    #%% Run analysis on repeatability force-displacement data
+    section_header('unit cell force repeatability')
+    sourcedir = os.path.join(rawdir,"unitCell_properties/unitCell_repeatability")
+    force.analyze_repeatability_data(sourcedir, bilayerDict, k_sq=ksq_fit,
+                                                          m=moment_fit, #p_lim=p_lim_fit,
+                                                          saveFlag=SAVE_FLAG, figdir=savedir)
+    
+    
+    #%% extra plot
+    h_repeat = 1.71e-3
+    r_repeat = 0.18
+    unit.analyze_h_T_relation(r_repeat, k_sq=ksq_fit, m=moment_fit, limFlag='exp', p_lim=[1e-14, 30],
+                             bilayerDict=bilayerDict,
+                             saveFlag=SAVE_FLAG, figdir=savedir)
+
     #%% Plot resulting best-fit curve
     # Commented out are the best-fit parameters found once upon a time...
     """
     ksq_fit = 0.005765489237871801
     moment_fit = 0.1897092016810536
     p_lim_fit = [1.77252756e-10, 1.91067338e+01]"""
-    force.plot_final_rconst_fit(ucdf, ksq_fit, moment_fit, p_lim_fit, bilayerDict, limFlag=limFlag)
+    force.plot_final_rconst_fit(ucdf, ksq_fit, moment_fit, p_lim_fit,bilayerDict, limFlag=limFlag)
+
+    
+    #%% Helper figures: 
+    h_val = 0.9e-3
+    r_val = 0.25
+    T_range = [25.0, 35.0, 50.0, 80.0]
+    unit.plot_energy_concept(h_val, r_val, 0.0, T_range,
+                             k_sq=ksq_fit, m=moment_fit, p_lim=p_lim_fit,
+                             bilayerDict=bilayerDict,
+                             figdir=savedir)
+
+    #%% Misc other phase diagrams: diagonal dependence
+    h_val = 1.2e-3
+    ratio_val = 0.4
+    thetaL_val = 0.0
+    unit.analyze_diagonal_dependence(h_val, ratio_val, thetaL_val,
+                                k_sq=ksq_fit, m=moment_fit, limFlag='exp', p_lim=p_lim_fit,#[1e-14, 30],
+                                bilayerDict=bilayerDict,
+                                saveFlag=SAVE_FLAG, figdir=savedir)
 
     #%% Run phase diagram generation   
     section_header('phase diagrams')    
@@ -149,8 +186,7 @@ if __name__ == "__main__":
                             T_range=T_range,
                             k_sq=ksq_fit, m=moment_fit, p_lim=p_lim_fit,
                             bilayerDict=bilayerDict,
-                            #limFlag=limFlag,
-                            savedir=tmpdir) 
+                            savedir=tmpdir, closeFlag=False) 
     
     
     

@@ -173,33 +173,48 @@ def fit_LCE_modulus_avg(sourcedir, saveFlag=False, figdir='', verboseFlag=False)
     T_max = 150
     interpEs = []
     interpEl = []
+    T_RT = []
+    E_s_RT = []
+    E_l_RT = []
     for filename in filelist:
         # Import data
         data = np.genfromtxt(os.path.join(sourcedir, filename), skip_header=2, delimiter='\t')
-        E_s = data[:,1]
-        E_l = data[:,2]
-        T = data[:,4]
-        # Smooth and crop data
-        #windowSize = 4
-        #cropIndex = math.ceil(windowSize/2)
-        #E_s = tensiletest.running_mean_centered(E_s, windowSize)[cropIndex:-cropIndex]
-        #E_l = tensiletest.running_mean_centered(E_l, windowSize)[cropIndex:-cropIndex]
-        #T = T[cropIndex:-cropIndex]
-        if min(T) > T_min:
-            T_min = min(T)
-        if max(T) < T_max:
-            T_max = max(T)
+        if data.ndim == 2: # temperature ramp
+            E_s = abs(data[:,1])
+            E_l = abs(data[:,2])
+            T = data[:,4]
+            # Smooth and crop data
+            windowSize = 4
+            cropIndex = math.ceil(windowSize/2)
+            E_s = tensiletest.running_mean_centered(E_s, windowSize)[cropIndex:-cropIndex]
+            E_l = tensiletest.running_mean_centered(E_l, windowSize)[cropIndex:-cropIndex]
+            T = T[cropIndex:-cropIndex]
+        else: # single point
+            E_s = np.array([abs(data[1])])
+            E_l = np.array([abs(data[2])])
+            T = np.array([data[4]])
+
+        if len(T) != 1:
+            if min(T) > T_min:
+                T_min = min(T)
+            if max(T) < T_max:
+                T_max = max(T)
        
         # Semilog plot shear, loss, total, and Young's moduli and fit 
         if verboseFlag:
-            p_guess = [-0.07, 62, 0.7] # dy, T0, y0
-            params = opt.curve_fit(model_elastic_modulus, T, E_s, p0=p_guess)[0]
+            if len(T) != 1:
+                p_guess = [-0.07, 62, 0.7] # dy, T0, y0
+                params = opt.curve_fit(model_elastic_modulus, T, E_s, p0=p_guess)[0]
 
             fig = plt.figure(dpi=200)
             plt.plot(T, 1e-6*E_s, '.r', label="E'")
             plt.plot(T, 1e-6*E_l, '.b', label="E''")
-            plt.plot(T, 1e-6*model_elastic_modulus(T, *params),
-                     'r', linewidth=1, linestyle='-',label="Exponential fit to E'")
+            if len(T) != 1:
+                plt.plot(T, 1e-6*model_elastic_modulus(T, *params),
+                         'r', linewidth=1, linestyle='-',label="Exponential fit to E'")
+                modelstr = "LCE fit:\t modulus = exp({0:.6f}(T-{1:.2f})) + {2:.0f}".format(params[0], params[1], params[2])    
+                print(modelstr)
+        
             plt.xlabel("Temperature ($^\circ$C)")
             plt.ylabel("Modulus (MPa)")
             ax = fig.gca()
@@ -207,12 +222,15 @@ def fit_LCE_modulus_avg(sourcedir, saveFlag=False, figdir='', verboseFlag=False)
             plt.ylim([.001, 100])
             plt.legend(loc="lower left")
     
-            modelstr = "LCE fit:\t modulus = exp({0:.6f}(T-{1:.2f})) + {2:.0f}".format(params[0], params[1], params[2])    
-            print(modelstr)
-        
+            
         # Add interpolation functions to list
-        interpEs.append(interp.interp1d(T, E_s))
-        interpEl.append(interp.interp1d(T, E_l))
+        if len(T) != 1:
+            interpEs.append(interp.interp1d(T, E_s))
+            interpEl.append(interp.interp1d(T, E_l))
+        else:
+            T_RT.append(T[0])
+            E_s_RT.append(E_s[0])
+            E_l_RT.append(E_l[0])    
 
     # Find average and standard deviation for storage and loss moduli based on
     # interpolation of smoothed data
@@ -230,6 +248,13 @@ def fit_LCE_modulus_avg(sourcedir, saveFlag=False, figdir='', verboseFlag=False)
     El_avg = np.mean(El_vals, axis=1)
     El_std = np.std(El_vals, axis=1)
     
+    T_RT_avg = np.mean(T_RT)
+    T_RT_std = np.std(T_RT)
+    Es_RT_avg = np.mean(E_s_RT)
+    Es_RT_std = np.std(E_s_RT)
+    El_RT_avg = np.mean(E_l_RT)
+    El_RT_std = np.std(E_l_RT)
+    
     # Fit to averaged data
     p_guess = [-0.07, 62, 0.7] # dy, T0, y0
     params = opt.curve_fit(model_elastic_modulus, T_avg, Es_avg, p0=p_guess)[0]
@@ -242,11 +267,13 @@ def fit_LCE_modulus_avg(sourcedir, saveFlag=False, figdir='', verboseFlag=False)
     plt.fill_between(T_avg, 1e-6*(El_avg-El_std), 1e-6*(El_avg+El_std), color='b', alpha=0.2)
     plt.plot(T_avg, 1e-6*model_elastic_modulus(T_avg, *params),
              'k', linewidth=1, linestyle='-',label="Exponential fit to E'")
+    plt.errorbar(T_RT_avg, 1e-6*Es_RT_avg, xerr=T_RT_std, yerr=1e-6*Es_RT_std, capsize=4, fmt='.', color='r', label="E' (RT)")
+    plt.errorbar(T_RT_avg, 1e-6*El_RT_avg, xerr=T_RT_std, yerr=1e-6*El_RT_std, capsize=4, fmt='.', color='b', label="E'' (RT)")
     plt.xlabel("Temperature ($^\circ$C)")
     plt.ylabel("Modulus (MPa)")
     ax = fig.gca()
     ax.set_yscale('log')
-    plt.ylim([.001, 100])
+    plt.ylim([.01, 10])
     plt.legend(loc="lower left")
     
     if saveFlag:

@@ -7,9 +7,12 @@ Created on Wed Jul 15 17:13:35 2020
 
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 from matplotlib import cm
 import matplotlib.colors as col
 import PDMS_LCE_dipole_statics as model
+
+
 
 
 def analyze_diagonal_dependence(h_val, ratio_val, thetaL_val, a_range, T_range):
@@ -40,11 +43,12 @@ def analyze_diagonal_dependence(h_val, ratio_val, thetaL_val, a_range, T_range):
 
     return numMin_array#, phase_array, angleT_array, angle0_array
 
-def plot_a_T_relation(T_range, a_range, h_val, r_val, thetaL_val, min_array):
+def plot_a_T_relation(T_range, a_range, h_val, r_val, thetaL_val, min_array,
+                      saveFlag=True, figdir=''):
     ''' Plot the stability relationship bewteen diagonal length $a$ and temperature $T$'''
     colors = ['xkcd:light red', 'xkcd:apple green', 'xkcd:apple green', 'xkcd:apple green', 'xkcd:electric blue', 'xkcd:blue purple', 'xkcd:electric blue']
     
-    fig = plt.figure()
+    fig = plt.figure(dpi=200)
     ax = fig.gca()
     X = 1000*a_range
     Y = T_range
@@ -57,21 +61,35 @@ def plot_a_T_relation(T_range, a_range, h_val, r_val, thetaL_val, min_array):
     plt.ylabel(r'Temperature $T$ ($^\circ$C)')
        
     #plt.ylim([np.amin(angle0_vals), np.amax(angle0_vals)])
-    #plt.savefig('angle_scaled_0_{0}_r_{1:0.2f}.png'.format(int(T_range[iT]), ratio_range[ir]))
+    if saveFlag:
+        title = 'angle_scaled_0_{0}_r_{1:0.2f}'.format(int(T_range[iT]), ratio_range[ir])
+        plt.savefig(os.path.join(figdir,'{0}.png'.format(title)),dpi=200)
+        plt.savefig(os.path.join(figdir,'{0}.svg'.format(title)))
 
     return
 
 
 if __name__ == "__main__":
+    cwd = os.path.dirname(os.path.abspath(__file__))
+    split = os.path.split(cwd)
+    if split[1] == 'modules':
+        cwd = split[0]
+    rawdir = os.path.join(cwd,"data/raw")
+    cleandir = os.path.join(cwd,"data/cleaned")
+    tmpdir = os.path.join(cwd,"tmp")
+    savedir = os.path.join(cwd,"results/figures_from_script")
+
+
     h = 0.0012
     r = 0.5
     thetaL = 0.0
-    a_range = np.arange(0.016, 0.027, 0.0001)
-    T_range = np.arange(25.0, 126.0, 1.0)
+    a_range = np.arange(0.015, 0.0255, 0.0005)
+    T_range = np.arange(20.0, 101.0, 1.0)
     
     sample = model.analyze_parameter_energy(h, r, 25.0, thetaL)
     
     numMin_array = analyze_diagonal_dependence(h_val=h,ratio_val=r,thetaL_val=thetaL,
                                                a_range=a_range, T_range=T_range)
     
-    plot_a_T_relation(T_range, a_range, h, r, thetaL, numMin_array)
+    plot_a_T_relation(T_range, a_range, h, r, thetaL, numMin_array,
+                      saveFlag=True, figdir=savedir)

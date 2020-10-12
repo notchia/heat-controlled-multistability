@@ -10,6 +10,7 @@ import os
 import pandas as pd
 import scipy.optimize as opt
 import scipy.interpolate as interp
+import scipy.signal as signal
 
 from modules import unitforcedata as experiment
 from modules import unitforcemodel as model
@@ -18,14 +19,17 @@ from modules import metamaterialmodel as metamat
 ANGLE_NEAR_ZERO = 1e-8 # Since setting angle to exactly zero can give numerical trouble
 
 #%% Anaylze repeatability data
-def analyze_repeatability_data(sourcedir):
+def analyze_repeatability_data(sourcedir, bilayerDict, k_sq=4e-3, setStartLoadToZero=False,
+                               m=[0.1431], p_lim=[1e-14, 30],
+                               saveFlag=False, figdir=''):
     ''' Check how repeatably we can manufacture and test unit cells with
         nominally identical parameters '''
     
-    ucdf = experiment.import_all_unit_cells(sourcedir)
-    experiment.plot_magnet_and_T_comparison(ucdf, legendOut=True)
+    ucdf = experiment.import_all_unit_cells(sourcedir, setStartLoadToZero=setStartLoadToZero,
+                                            bilayerDict=bilayerDict)
+    experiment.plot_magnet_and_T_comparison(ucdf, legendOut=True)    
     
-    ksq = 4e-3
+    ksq = k_sq
 
     # Get UCDF for averaged data
     ucdf_avg_N = pd.DataFrame()
@@ -35,7 +39,12 @@ def analyze_repeatability_data(sourcedir):
         ucdf_avg_N = ucdf_avg_N.append(unitCell_avg.get_Series(),ignore_index=True)
     
     experiment.plot_magnet_and_T_comparison(ucdf_avg_N, stdFlag=True)
-    
+    if saveFlag:
+        title = 'unitCell_repeatability_force_N'
+        plt.savefig(os.path.join(figdir,"{0}.png".format(title)), dpi=200)
+        plt.savefig(os.path.join(figdir,"{0}.svg".format(title)), transparent=True)   
+ 
+   
     for index, row in ucdf_avg_N.iterrows():
         unitData = row["data"]
         plt.figure(dpi=200)
@@ -44,21 +53,105 @@ def analyze_repeatability_data(sourcedir):
         plt.title(unitData.label)
         disp_plt = unitData.strain
         
-        plt.plot(disp_plt, unitData.load-unitData.load[0], 'k', label="experiment")
+        plt.plot(disp_plt, unitData.load, 'k', label="experiment")
         unitModel = metamat.MetamaterialModel(unitData.h, unitData.r, ANGLE_NEAR_ZERO,
-                                              T=unitData.T, d=unitData.d, s=unitData.s, 
-                                              k_sq=ksq, loadFlag=True, hasMagnets=bool(unitData.magnets))
+                                              T=unitData.T, d=unitData.d, 
+                                              k_sq=ksq, loadFlag=True, hasMagnets=bool(unitData.magnets),
+                                              **bilayerDict)
         plt.plot(disp_plt, unitModel.model_load_disp(unitData.disp), 'r', label="model")
-        plt.fill_between(disp_plt, unitData.load-unitData.load[0]-unitData.std, unitData.load-unitData.load[0]+unitData.std, color='k', alpha=0.2)
+        plt.fill_between(disp_plt, unitData.load-unitData.std, unitData.load+unitData.std, color='k', alpha=0.2)
         print(r"T = {0}C, $\theta_T$ = {1:.2f}, k = {2:.2e}".format(unitData.T, np.degrees(unitModel.total_angle), unitModel.hinge.k))
         plt.legend()  
         
         p_given_exp = [unitModel.total_angle, unitModel.d/2, 'exp']
         p_guess_exp = [0.001, 5e-20, 50]
-        params = model.approximate_spring(unitData.disp, -(unitData.load-unitData.load[0]), p_guess_exp, p_given_exp)
+        params = model.approximate_spring(unitData.disp, -(unitData.load), p_guess_exp, p_given_exp)
+        print(params)
         #print('{0},{1}'.format(params[1],params[2]))   
 
-    return ucdf
+    ucdf_Y = ucdf.loc[ucdf["magnets"] == 1]  
+#    experiment.plot_magnet_and_T_comparison(ucdf_Y, legendOut=False)
+
+#    moment_fit = analyze_rconst_moment(ucdf_Y, k_sq, bilayerDict)
+#    print("m_fit: {0}".format(moment_fit))
+
+    # Analyze Y case
+    colors = ['r','g','b']
+    TLabels = ['RT', 'T~45$^\circ$', 'T~75$^\circ$']
+    
+    fig = plt.figure('unitCell_repeatability_energy', dpi=200)
+    plt.xlabel("Angle $\theta$ ($^\circ$)")
+    plt.ylabel("Energy (J)")
+    
+    fig = plt.figure('unitCell_repeatability_force_Y', dpi=200)
+    plt.xlabel("Strain, $\delta/d$")
+    plt.ylabel("Load (N)")
+    plt.axhline(color='k',linewidth=1)
+    
+    for index, row in ucdf_Y.iterrows():
+        unitData = row["data"]
+        
+        iplt = unitData.T_group
+        
+        # Plot individual curve with model
+        # plt.figure(dpi=200)
+        # plt.xlabel("Strain, $\delta/d$")
+        # plt.ylabel("Load (N)")
+        # plt.title(unitData.label)
+        disp_plt = unitData.strain
+        
+        # plt.plot(disp_plt, unitData.load-unitData.load[0], 'k', label="experiment")
+        unitModel = metamat.MetamaterialModel(unitData.h, unitData.r, ANGLE_NEAR_ZERO,
+                                              T=unitData.T, d=unitData.d, 
+                                              k_sq=ksq, loadFlag=True, hasMagnets=bool(unitData.magnets),
+                                              m=m, p_lim=p_lim,
+                                              **bilayerDict)
+        #plt.plot(disp_plt, unitModel.model_load_disp(unitData.disp), 'r', label="model")
+        #plt.fill_between(disp_plt, unitData.load-unitData.load[0]-unitData.std, unitData.load-unitData.load[0]+unitData.std, color='k', alpha=0.2)
+        print(r"T = {0}C, $\theta_T$ = {1:.2f}, k = {2:.2e}".format(unitData.T, np.degrees(unitModel.total_angle), unitModel.hinge.k))
+        #plt.legend()  
+
+        fig = plt.figure('unitCell_repeatability_force_Y')        
+        plt.plot(disp_plt, unitData.load, colors[iplt], label="experiment, {0}".format(TLabels[iplt]))
+        plt.plot(disp_plt, unitModel.model_load_disp(unitData.disp), colors[iplt]+'--',
+                 label="model, {0}".format(TLabels[iplt]))
+        
+        fig = plt.figure('unitCell_repeatability_energy')
+        U_total, q_range = unitModel.model_energy()
+        zeroIndex = np.where(q_range > 0)[0][0]
+        U_total = U_total - U_total[zeroIndex]
+        plt.plot(np.degrees(q_range), U_total, colors[iplt], label=TLabels[iplt])
+
+        minima = signal.argrelmin(U_total)[0]
+        maxima = signal.argrelmax(U_total)[0]
+        minU = U_total[minima]
+        maxU = U_total[maxima]
+        plt.plot(np.degrees(q_range[minima]), minU, colors[iplt]+'v')
+        plt.plot(np.degrees(q_range[maxima]), maxU, colors[iplt]+'^')
+        
+        minU.sort()
+        maxU.sort()
+        if maxU.size > 0:
+            plt.ylim(minU[0]-0.0001, 0.003)
+        
+        p_given_exp = [unitModel.total_angle, unitModel.d/2, 'exp']
+        p_guess_exp = [0.001, 5e-20, 50]
+        params = model.approximate_spring(unitData.disp, -(unitData.load-unitData.load[0]), p_guess_exp, p_given_exp)
+    
+    if saveFlag:
+        title = 'unitCell_repeatability_energy'
+        fig = plt.figure(title, dpi=200)
+        plt.legend()
+        plt.savefig(os.path.join(figdir,"{0}.png".format(title)), dpi=200)
+        plt.savefig(os.path.join(figdir,"{0}.svg".format(title)), transparent=True)       
+        
+        title = 'unitCell_repeatability_force_Y'
+        fig = plt.figure(title, dpi=200)
+        plt.legend()
+        plt.savefig(os.path.join(figdir,"{0}.png".format(title)), dpi=200)
+        plt.savefig(os.path.join(figdir,"{0}.svg".format(title)), transparent=True)   
+
+    return
 
 #%% Anaylze rconstant data
 def import_rconst_data(sourcedir, bilayerDict={}, setStartLoadToZero=False):
@@ -514,7 +607,7 @@ if __name__ == "__main__":
     tmpdir = os.path.join(cwd,"tmp")
     
     sourcedir = os.path.join(rawdir,"unitCell_repeatability")
-    analyze_repeatability_data(sourcedir)
+    #analyze_repeatability_data(sourcedir)
     
     sourcedir = os.path.join(rawdir,"unitCell_tension_rconst")
     #analyze_rconst_data(sourcedir)

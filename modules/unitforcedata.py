@@ -237,12 +237,16 @@ def compute_unitCell_mean_std(ucdf, nPoints=2500):
     
     # Find minimum value of maximum strain reached and construct new strain vector
     maxStrain = 1
+    minStrain = 0
     for index, row in ucdf.iterrows():
         unit = row["data"]
         currentMax = max(unit.strain)
+        currentMin = min(unit.strain)
         if currentMax < maxStrain:
             maxStrain = currentMax
-    strain = np.linspace(1e-4, maxStrain, nPoints)
+        if currentMin > minStrain:
+            minStrain = currentMin
+    strain = np.linspace(minStrain, maxStrain, nPoints)
     
     # Crop load to maxStrain and save interpolated version to array
     count = 0

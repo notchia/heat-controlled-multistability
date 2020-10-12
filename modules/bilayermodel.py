@@ -503,7 +503,8 @@ def get_h_adjustment_coeff(h, r, fit_to_h, h_ref):
 def analyze_curvature_change_with_temp(LCE_modulus_params=[],LCE_strain_params=[],
                                    saveFlag=False, figdir='', verboseFlag=False):
     ''' 2D color plot of angle on h-T axes '''
-    h_range = 1e-3*np.arange(0.5,2.5,0.5) #[m]
+    #h_range = 1e-3*np.arange(0.5,2.5,0.5) #[m]
+    h_range = 1e-3*np.array([1.0])
     r_range = np.arange(0.01,1.0,0.01)
     T_range = np.arange(25,101,1)
     
@@ -518,8 +519,13 @@ def analyze_curvature_change_with_temp(LCE_modulus_params=[],LCE_strain_params=[
                 kappaT_vals[i,j] = bilayer.curvature
                 thetaT_vals[i,j] = bilayer.thetaT
                 normT_vals[i,j] = h*bilayer.curvature/(-np.log(r))
+        indices = np.unravel_index(np.argmax(thetaT_vals), thetaT_vals.shape)
+        print(indices)
+        print("Maximum normalized curvature is {0:.4f} at r={1:.3f} and T={2:.1f}".format(
+            thetaT_vals[indices], r_range[indices[1]], T_range[indices[0]]))
         colorplot_change_with_temp(h, h, r_range, T_range, thetaT_vals,
-                                   barLabel='Normalized curvature $h\kappa$', figLabel='thetaT',
+                                   barLabel='Normalized curvature $h\kappa$',
+                                   figLabel='thetaT',
                                    saveFlag=saveFlag, figdir=figdir)
         if verboseFlag:
             colorplot_change_with_temp(h, h, r_range, T_range, kappaT_vals,
