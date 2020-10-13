@@ -602,7 +602,7 @@ def plot_isotherm(r, T, phases, angle0_vals,
     i_T = np.argwhere(T_range == T)[0][0]
     #assert i_T, "Choose a value of T that is in T_range; specify T_range if not default"
     
-    colors = ['xkcd:light red', 'xkcd:apple green', 'xkcd:apple green', 'xkcd:apple green', 'xkcd:electric blue', 'xkcd:blue purple', 'xkcd:electric blue']
+    colors = ['xkcd:light red', 'xkcd:apple green', 'xkcd:apple green', 'xkcd:apple green', 'xkcd:electric blue', 'xkcd:electric blue', 'xkcd:electric blue']
     fig = plt.figure(dpi=200)
     ax = fig.gca()
     X = 1000*h_range
@@ -650,7 +650,7 @@ def plot_energy_concept(h_total, ratio, thetaL, T_range,
                                k_sq=k_sq, m=m, limFlag=limFlag, p_lim=p_lim,
                                **bilayerDict)
     
-    plt.figure(dpi=300)
+    plt.figure(figsize=(5, 8), dpi=200)
     plt.title(r"$h$={0}mm, $r$={1}, $\theta_L$={2:0.1f}$^\circ$".format(h_total, ratio, np.degrees(thetaL)))
     plt.xlabel(r"Angle $\theta$ (degrees)")
     plt.ylabel("Energy (J)")   
@@ -673,6 +673,7 @@ def plot_energy_concept(h_total, ratio, thetaL, T_range,
    
     plt.ylim(-0.0015,0.002)
     plt.legend()
+    plt.savefig(os.path.join(figdir,'{0}.png'.format('energy_concept')))
     plt.savefig(os.path.join(figdir,'{0}.svg'.format('energy_concept')))
 
 #%%

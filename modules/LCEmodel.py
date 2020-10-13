@@ -184,7 +184,7 @@ def fit_LCE_modulus_avg(sourcedir, saveFlag=False, figdir='', verboseFlag=False)
             E_l = abs(data[:,2])
             T = data[:,4]
             # Smooth and crop data
-            windowSize = 4
+            windowSize = 2
             cropIndex = math.ceil(windowSize/2)
             E_s = tensiletest.running_mean_centered(E_s, windowSize)[cropIndex:-cropIndex]
             E_l = tensiletest.running_mean_centered(E_l, windowSize)[cropIndex:-cropIndex]

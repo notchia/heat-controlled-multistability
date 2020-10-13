@@ -212,11 +212,11 @@ def analyze_rconst_moment(ucdf, k_sq_fit, bilayerDict):
         unitModel = metamat.MetamaterialModel(unitData.h, unitData.r, ANGLE_NEAR_ZERO,
                                               T=unitData.T, d=unitData.d,
                                               k_sq=k_sq_fit,
-                                              hasMagnets=0,
+                                              hasMagnets=0, p_lim=[0,0],
                                               **bilayerDict) # Using this only for k_eq
 
         # Use subset of load-disp data before collision begins to fit moment
-        maxStrain = 0.200#0.175
+        maxStrain = 0.175#0.200 # SHOULD BE SAME AS THAT USED FOR COLLISION
         maxIndex = np.where(unitData.strain < maxStrain)[0][-1]
         p_given = [unitModel.total_angle, unitModel.k_eq, unitData.d/2]
 
@@ -349,11 +349,13 @@ def residue_constant_collision(p, ucdf, params_given, limFlag='exp'):
                                               analysisFlag=False,
                                               **bilayerDict)
 
-        # Use subset of load-disp data before collision begins to fit moment
+        # Use subset of load-disp data after collision begins to fit parameters
+        minStrain = 0.25#0.175 # SHOULD BE SAME AS THAT USED FOR MOMENT??
+        minIndex = np.where(unitData.strain < minStrain)[0][-1]
         p_given = [unitModel.total_angle, unitModel.k_eq, unitData.d/2, m_fit]
         p_guess = p
-        p_lim_fit_individual[count,:] = model.approximate_only_collision(unitData.disp,
-                                                                       -unitData.load,
+        p_lim_fit_individual[count,:] = model.approximate_only_collision(unitData.disp[minIndex:],
+                                                                       -unitData.load[minIndex:],
                                                                        p_guess, p_given)
         count += 1
 

@@ -20,6 +20,10 @@ def section_header(section):
     print('\n**************************\n> Processing data on {0} properties...'.format(section))
     return None
 
+def item_header(item):
+    print('> {0}...'.format(item))
+    return None
+
 SAVE_FLAG = True
 VERBOSE_FLAG = False
 
@@ -47,15 +51,11 @@ if __name__ == "__main__":
     section_header('LCE')
     sourcedir = os.path.join(rawdir, "LCE_properties")
     fname_strain = "ImageJ_measurements_31.5014mm2px.csv"
-    fname_modulus = "200901_LCE_DMA_2.txt"#"200820_LCE_DMA.txt"
     strainParams, strainModel = lce.fit_LCE_strain(os.path.join(sourcedir, "LCE_contraction/"+fname_strain),
                                                    saveFlag=SAVE_FLAG, figdir=savedir)
-    #modulusParams, modulusModel = lce.fit_LCE_modulus(os.path.join(sourcedir, fname_modulus))
     modulusParams, modulusModel = lce.fit_LCE_modulus_avg(os.path.join(sourcedir, "LCE_DMA"),
                                                           verboseFlag=VERBOSE_FLAG, saveFlag=SAVE_FLAG, figdir=savedir)
-    #lce.fit_LCE_tensile(os.path.join(sourcedir, "LCE_tensile"),
-    #                    saveFlag=SAVE_FLAG, figdir=savedir)
-    
+
     #%% Get magnetic moment and check temperature degradation 
     section_header('magnet')
     sourcedir = os.path.join(rawdir, "magnet_properties")
@@ -71,7 +71,7 @@ if __name__ == "__main__":
     sourcedir = os.path.join(rawdir, "bilayer_properties")
     datafile = os.path.join(sourcedir, "200819_bilayer_ImageJ_curvature.csv")
     paramfile = os.path.join(sourcedir, "200819_bilayer_parameters.csv")
-    hinge.analyze_data_200819(paramfile, datafile, LCE_modulus_params=modulusParams, 
+    hinge.analyze_bending_data_200819(paramfile, datafile, LCE_modulus_params=modulusParams, 
                               LCE_strain_params=strainParams, 
                               saveFlag=SAVE_FLAG, figdir=savedir, verboseFlag=VERBOSE_FLAG)  
     hinge.analyze_curvature_change_with_temp(LCE_modulus_params=modulusParams,
@@ -90,14 +90,9 @@ if __name__ == "__main__":
                            LCE_strain_params=strainParams, titlestr='fixed r',
                            saveFlag=SAVE_FLAG, figdir=savedir)
     print("b_fit: {0}".format(b_fit))
-#    print("constant h:")
-#    datafile = os.path.join(sourcedir, "hconst_angles_ImageJ.csv")
-#    paramfile = os.path.join(sourcedir, "hconst_parameters.csv")
-#    hinge.analyze_bending_angles(datafile, paramfile,
-#                                 LCE_modulus_params=modulusParams,
-#                                 LCE_strain_params=strainParams, titlestr='fixed h')
 
-    #%% Run analysis on repeatability force-displacement data
+
+    #%% Define dictionary to easily pass the fitting parameters through the rest of the modeling
     bilayerDict = {"LCE_modulus_params":modulusParams,
                    "LCE_strain_params":strainParams,
                    "b":b_fit,
@@ -107,15 +102,21 @@ if __name__ == "__main__":
     section_header('unit cell constant-r force')
     sourcedir = os.path.join(rawdir,"unitCell_properties/unitCell_tension_rconst")
     r_avg, ucdf = force.import_rconst_data(sourcedir, bilayerDict)
+    #r_avg, ucdf = force.import_rconst_data(sourcedir, setStartLoadToZero=True)#, bilayerDict)
     
+    #%% Find best-fit square stiffness for r-const data
+    item_header("Finding best-fit k_sq")
     ksq_fit = force.analyze_rconst_nomagnets(ucdf, bilayerDict)
     print("k_sq_fit: {0}".format(ksq_fit))
 
-    #%%
-    # CURRENTLY THIS DOES NOT WORK. run the next cell instead
+    #%% Find best-fit magnetic moment and collision parameters for r-const data
+    item_header("Finding best-fit moment and p_lim")
     
     limFlag='exp'
+    
+    
     """
+    # This version does not work!
     p_guess = [0.18,3e-10, 18]
     weightMagnitude = 1.0# 0.5
     moment_fit, p_lim_fit = force.analyze_rconst_moment_and_collision(ucdf, ksq_fit,
@@ -125,38 +126,41 @@ if __name__ == "__main__":
                                                                       weightMagnitude=weightMagnitude)
     print("m_fit: {0}".format(moment_fit))
     print("p_lim_fit: {0}".format(p_lim_fit))
+    
     """
-    #%%    
     moment_fit = force.analyze_rconst_moment(ucdf, ksq_fit, bilayerDict)
     print("m_fit: {0}".format(moment_fit))
     p_lim_fit = force.analyze_rconst_collision(ucdf, ksq_fit, moment_fit, bilayerDict)
     print("p_lim_fit: {0}".format(p_lim_fit))
     
-    #%% Run analysis on repeatability force-displacement data
+    
+    #%% Plot resulting best-fit curves
+    # Commented out are the best-fit parameters found once upon a time...
+    
+    item_header("Plotting resulting fit for r_const load-disp data")
+    
+    """
+    ksq_fit = 0.005765489237871801
+    moment_fit = 0.1897092016810536
+    p_lim_fit = [1.77252756e-10, 1.91067338e+01]
+    """
+    force.plot_final_rconst_fit(ucdf, ksq_fit, moment_fit, p_lim_fit,bilayerDict, limFlag=limFlag)
+
+
+    #%% Run analysis on repeatability force-displacement data, using fits from r-const data
     section_header('unit cell force repeatability')
     sourcedir = os.path.join(rawdir,"unitCell_properties/unitCell_repeatability")
-    force.analyze_repeatability_data(sourcedir, bilayerDict, k_sq=ksq_fit,
-                                                          m=moment_fit, #p_lim=p_lim_fit,
-                                                          saveFlag=SAVE_FLAG, figdir=savedir)
-    
-    
-    #%% extra plot
+    force.analyze_repeatability_data(sourcedir, bilayerDict, k_sq=ksq_fit, m=moment_fit,
+                                     saveFlag=SAVE_FLAG, figdir=savedir)
+
     h_repeat = 1.71e-3
     r_repeat = 0.18
     unit.analyze_h_T_relation(r_repeat, k_sq=ksq_fit, m=moment_fit, limFlag='exp', p_lim=[1e-14, 30],
                              bilayerDict=bilayerDict,
                              saveFlag=SAVE_FLAG, figdir=savedir)
-
-    #%% Plot resulting best-fit curve
-    # Commented out are the best-fit parameters found once upon a time...
-    """
-    ksq_fit = 0.005765489237871801
-    moment_fit = 0.1897092016810536
-    p_lim_fit = [1.77252756e-10, 1.91067338e+01]"""
-    force.plot_final_rconst_fit(ucdf, ksq_fit, moment_fit, p_lim_fit,bilayerDict, limFlag=limFlag)
-
-    
-    #%% Helper figures: 
+        
+    #%% Generate additional manuscript figures: energy plots and 2D phase diagrams
+    # Plot comparing change in total and spring energy with temperature (for Fig. 1)
     h_val = 0.9e-3
     r_val = 0.25
     T_range = [25.0, 35.0, 50.0, 80.0]
@@ -165,7 +169,7 @@ if __name__ == "__main__":
                              bilayerDict=bilayerDict,
                              figdir=savedir)
 
-    #%% Misc other phase diagrams: diagonal dependence
+    # 2D phase diagram: dependence on diagonal
     h_val = 1.2e-3
     ratio_val = 0.4
     thetaL_val = 0.0
@@ -174,7 +178,8 @@ if __name__ == "__main__":
                                 bilayerDict=bilayerDict,
                                 saveFlag=SAVE_FLAG, figdir=savedir)
 
-    #%% Run phase diagram generation   
+
+    #%% Generate and plot 3D phase diagram 
     section_header('phase diagrams')    
     r_range = np.array([r_avg]) #r_const average value
     h_range = 1e-3*np.arange(0.7,2.1,0.01)

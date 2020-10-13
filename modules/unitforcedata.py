@@ -109,7 +109,7 @@ class UnitCellData:
         load = arr[:,1]
         baseNoiseLevel = 0.05 #[N]
         startTrim = np.argwhere(np.abs(load-load[0]) > baseNoiseLevel)[0][0]
-        endTrim = np.argmax(load)
+        endTrim = np.argmax(load) # Viscous decay begins immediately after motion ends
         
         # Trim and re-zero data according to offset values
         tempLoadOffset = calibration.get_temperature_load_offset(self.T)
@@ -198,7 +198,8 @@ def import_all_unit_cells(sourcedir, cropFlag=True, figFlag=False, setStartLoadT
             UCDF = UCDF.append(ucd.get_Series(),ignore_index=True)
         count += 1
 
-    if any(bilayerDict): # update based on modeled angle!
+    # Update the load zero offset based on the modeled angle.
+    if any(bilayerDict):
         ucdf_Y = UCDF.loc[UCDF["magnets"] == 1]
         for index, row in ucdf_Y.iterrows():
             h = row["h"]

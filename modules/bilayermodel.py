@@ -281,7 +281,7 @@ def analyze_data_200814(filepath):
     return
 
 
-def analyze_data_200819(paramfile, datafile, LCE_modulus_params=[], LCE_strain_params=[],
+def analyze_bending_data_200819(paramfile, datafile, LCE_modulus_params=[], LCE_strain_params=[],
                         saveFlag=False, figdir='', verboseFlag=False):
     ''' Process bending data for bilayer samples 1-6 (note samples 4 & 5 are
         nominally the same, so these were combined).'''
@@ -520,7 +520,6 @@ def analyze_curvature_change_with_temp(LCE_modulus_params=[],LCE_strain_params=[
                 thetaT_vals[i,j] = bilayer.thetaT
                 normT_vals[i,j] = h*bilayer.curvature/(-np.log(r))
         indices = np.unravel_index(np.argmax(thetaT_vals), thetaT_vals.shape)
-        print(indices)
         print("Maximum normalized curvature is {0:.4f} at r={1:.3f} and T={2:.1f}".format(
             thetaT_vals[indices], r_range[indices[1]], T_range[indices[0]]))
         colorplot_change_with_temp(h, h, r_range, T_range, thetaT_vals,
