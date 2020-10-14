@@ -114,9 +114,16 @@ if __name__ == "__main__":
     
     limFlag='exp'
     
+    """
+    # This version also does not work
+    p_fit =  force.analyze_rconst_moment_and_collision_test(ucdf, ksq_fit, bilayerDict)
+    print("m_fit and p_lim_fit: {0}".format(p_fit))
+    moment_fit = p_fit[0]
+    p_lim_fit = p_fit[1:]
+    """
     
     """
-    # This version does not work!
+    # This version does not work
     p_guess = [0.18,3e-10, 18]
     weightMagnitude = 1.0# 0.5
     moment_fit, p_lim_fit = force.analyze_rconst_moment_and_collision(ucdf, ksq_fit,
@@ -126,24 +133,23 @@ if __name__ == "__main__":
                                                                       weightMagnitude=weightMagnitude)
     print("m_fit: {0}".format(moment_fit))
     print("p_lim_fit: {0}".format(p_lim_fit))
-    
     """
+        
     moment_fit = force.analyze_rconst_moment(ucdf, ksq_fit, bilayerDict)
     print("m_fit: {0}".format(moment_fit))
     p_lim_fit = force.analyze_rconst_collision(ucdf, ksq_fit, moment_fit, bilayerDict)
     print("p_lim_fit: {0}".format(p_lim_fit))
     
-    
     #%% Plot resulting best-fit curves
     # Commented out are the best-fit parameters found once upon a time...
-    
-    item_header("Plotting resulting fit for r_const load-disp data")
-    
     """
     ksq_fit = 0.005765489237871801
     moment_fit = 0.1897092016810536
     p_lim_fit = [1.77252756e-10, 1.91067338e+01]
-    """
+    """    
+    
+    item_header("Plotting resulting fit for r_const load-disp data")  
+
     force.plot_final_rconst_fit(ucdf, ksq_fit, moment_fit, p_lim_fit,bilayerDict, limFlag=limFlag)
 
 

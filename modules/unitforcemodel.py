@@ -201,7 +201,7 @@ def fit_magnet_and_collision_weighted(disp, force, p_guess, p_given, weights,
    
     return p_fit
 
-def approximate_magnet_collision(disp, force, p_guess, p_given, figFlag=True):
+def approximate_magnet_collision(disp, force, p_guess, p_given, figFlag=False):
     ''' Given some known parameters p_given, determine fitting parameters p_guess '''
     
     q0, kq, L = p_given
@@ -211,17 +211,18 @@ def approximate_magnet_collision(disp, force, p_guess, p_given, figFlag=True):
     # Fit to model
     p_fit = opt.least_squares(residue_force_displacement_magnet_collision, p_guess,
                                       args=(force, disp, q0, kq, L))
-    moment, qlim, klim = p_fit.x
-    paramstr = "moment: {0:.4f} A$\cdot$m$^2$\n$q_{{lim}}$: {1:.4f}$^\circ$\n$k_{{lim}}$: {2:.4f} Nm".format(moment, np.degrees(qlim), klim)
+    #moment, p1, p2 = p_fit.x
+    #paramstr = "moment: {0:.4f} A$\cdot$m$^2$\n$q_{{lim}}$: {1:.4f}$^\circ$\n$k_{{lim}}$: {2:.4f} Nm".format(moment, np.degrees(qlim), klim)
 
-    force_fit = force_displacement_magnet_collision(disp, p_fit.x, q0, kq, L)
-    energy_fit = np.cumsum(force_fit)
+    #force_fit = force_displacement_magnet_collision(disp, p_fit.x, q0, kq, L)
+    #energy_fit = np.cumsum(force_fit)
     
-    if figFlag:
-        plot_force_and_energy(disp_plt, force, force_fit, energy_fit,
-                              titlestr='With magnet', notestr=paramstr)
+    #if figFlag:
+    #    plot_force_and_energy(disp_plt, force, force_fit, energy_fit,
+    #                          titlestr='With magnet', notestr=paramstr)
 
-    return moment, qlim, klim
+    
+    return p_fit.x
 
 
 def approximate_magnet(disp, force, p_guess, p_given, figFlag=True):
@@ -261,13 +262,13 @@ def approximate_only_magnet(disp, force, p_guess, p_given, figFlag=False):
     moment = p_fit.x[0]
     paramstr = "moment: {0:.4f} A$\cdot$m$^2$".format(moment)
 
-    force_fit = force_displacement_only_magnet(disp, p_fit.x, q0, kq, L)
-    energy_fit = np.cumsum(force_fit)
-    energy_fit = energy_fit - energy_fit[0]
+#    force_fit = force_displacement_only_magnet(disp, p_fit.x, q0, kq, L)
+#    energy_fit = np.cumsum(force_fit)
+#    energy_fit = energy_fit - energy_fit[0]
     
-    if figFlag:
-        plot_force_and_energy(disp_plt, force, force_fit, energy_fit,
-                              titlestr='With magnet, no collision', notestr='')
+#    if figFlag:
+#        plot_force_and_energy(disp_plt, force, force_fit, energy_fit,
+#                              titlestr='With magnet, no collision', notestr='')
 
     return moment
 
@@ -284,13 +285,13 @@ def approximate_only_collision(disp, force, p_guess, p_given, figFlag=False):
     p_lim = p_fit.x
     paramstr = "p_lim: {0}".format(p_lim)
 
-    force_fit = force_displacement_magnet(disp, [m, p_lim[0], p_lim[1]], q0, kq, L)
-    energy_fit = np.cumsum(force_fit)
-    energy_fit = energy_fit - energy_fit[0]
+#    force_fit = force_displacement_magnet(disp, [m, p_lim[0], p_lim[1]], q0, kq, L)
+#    energy_fit = np.cumsum(force_fit)
+#    energy_fit = energy_fit - energy_fit[0]
     
-    if figFlag:
-        plot_force_and_energy(disp_plt, force, force_fit, energy_fit,
-                              titlestr='With magnet, no collision', notestr=paramstr)
+#    if figFlag:
+#        plot_force_and_energy(disp_plt, force, force_fit, energy_fit,
+#                              titlestr='With magnet, no collision', notestr=paramstr)
 
     return p_lim
 
