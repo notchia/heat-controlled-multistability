@@ -25,7 +25,7 @@ from modules import unitforcemodel as model
 class UnitCellData:
     ''' Store and manipulate data for each materials-tester data file imported'''
     def __init__(self, csvpath, cropFlag=True, figFlag=False, initEmpty=False,
-                 setStartLoadToZero=False, setZeroLoadFromAngle=False):
+                 setStartLoadToZero=False, setZeroLoadFromAngle=False, m=0):
         ''' Set metadata based on filename and import load-displacement data  '''
 
         # Set parameter information -------------------------------------------
@@ -38,6 +38,7 @@ class UnitCellData:
         self.s          = self._get_re_value(csvname,'_s(\d*\.\d+)',0.)*1e-3  # [m] arc length, measured in ImageJ
         self.magnets    = self._get_re_value(csvname,'_([NY])_',0)            # True/False: are there (attracting) magnets?
         self.tag        = self._get_re_value(csvname,'(_tag-[.*]_)','')       # string to tag related data
+        self.m          = m
         
         self.label      = 'h={0:.2f}mm, r={1:.2f}, T={2:.1f}$^\circ$C, s={3:.2f}mm, magnets={4}'.format(self.h*1e3, self.r, self.T, self.s*1e3, self.magnets) 
         self.T_group  = self._get_temperature_group()
@@ -180,7 +181,7 @@ class UnitCellData:
 
 #%% Utilities for importing and analyzing multiple datasets
 def import_all_unit_cells(sourcedir, cropFlag=True, figFlag=False, setStartLoadToZero=False,
-                          bilayerDict={}):
+                          bilayerDict={}, m=0):
     ''' Import all unit cell data from a directory into a DataFrame '''
     
     UCDF = pd.DataFrame()  
@@ -192,7 +193,7 @@ def import_all_unit_cells(sourcedir, cropFlag=True, figFlag=False, setStartLoadT
             # Initialize and add data to UnitCellData class instance, then store in dataframe
             filepath = os.path.join(sourcedir, entry)
             ucd = UnitCellData(filepath, cropFlag=cropFlag, figFlag=figFlag,
-                               setStartLoadToZero=setStartLoadToZero)
+                               setStartLoadToZero=setStartLoadToZero, m=m)
             if any(bilayerDict) and (ucd.magnets == 0): # update based on modeled angle!
                 ucd.set_zero_with_angle(bilayerDict)
             UCDF = UCDF.append(ucd.get_Series(),ignore_index=True)

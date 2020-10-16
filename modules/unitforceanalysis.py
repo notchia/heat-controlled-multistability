@@ -154,12 +154,12 @@ def analyze_repeatability_data(sourcedir, bilayerDict, k_sq=4e-3, setStartLoadTo
     return
 
 #%% Anaylze rconstant data
-def import_rconst_data(sourcedir, bilayerDict={}, setStartLoadToZero=False):
+def import_rconst_data(sourcedir, bilayerDict={}, setStartLoadToZero=False, m=0):
     ''' Check how repeatably we can manufacture and test unit cells with
         nominally identical parameters '''
     
     ucdf = experiment.import_all_unit_cells(sourcedir, setStartLoadToZero=setStartLoadToZero,
-                                            figFlag=False, bilayerDict=bilayerDict)
+                                            figFlag=False, bilayerDict=bilayerDict, m=m)
     experiment.plot_magnet_and_T_comparison(ucdf, legendOut=True)
 
     r_avg = ucdf["r"].mean()
@@ -198,6 +198,44 @@ def analyze_rconst_nomagnets(ucdf, bilayerDict):
     
     return k_sq_fit
 
+def analyze_rconst_ksq(ucdf, bilayerDict):
+    ''' Analysis of just no-magnet case: find best-fit square stiffness ksq (in
+        series with hinge stiffness kq) '''
+    
+    ucdf_Y = ucdf.loc[ucdf["magnets"] == 1] 
+    
+    # Find individual best-fit values for k_q
+    p_fit_spring_individual = np.zeros(len(ucdf_Y))
+    count = 0
+    for index, row in ucdf_Y.iterrows():
+        unitData = row["data"]
+        unitModel = metamat.MetamaterialModel(unitData.h, unitData.r, ANGLE_NEAR_ZERO,
+                                              T=unitData.T, d=unitData.d,
+                                              hasMagnets=bool(unitData.magnets), m=unitData.m,
+                                              **bilayerDict)
+
+        # Use subset of load-disp data before collision begins to fit k_q
+        maxStrain = 0.15#0.225
+        maxIndex = np.where(unitData.strain < maxStrain)[0][-1]
+        #p_given = [unitModel.total_angle, unitData.d/2]
+        q0 = unitModel.total_angle
+        L = unitData.d/2
+        m = unitData.m
+        p_lim = [0,0]
+        p_guess = 1e-3 # k_q guess
+
+        p_fit = opt.least_squares(model.residue_force_displacement_spring_from_all, p_guess,
+                                  args=(-unitData.load[:maxIndex], unitData.disp[:maxIndex], q0, L, m, p_lim))
+        
+        p_fit_spring_individual[count] = p_fit.x[0]
+        count += 1
+
+    # Find best-fit value for k_sq
+    p_fit_all = fit_constant_ksq(ucdf_Y, p_fit_spring_individual)
+    k_sq_fit = p_fit_all.x[0]
+    
+    return k_sq_fit
+
 def analyze_rconst_moment(ucdf, k_sq_fit, bilayerDict):
     ''' Analysis of just with-magnet case: find best-fit magnetic moment m '''
     ucdf_Y = ucdf.loc[ucdf["magnets"] == 1]  
@@ -216,14 +254,18 @@ def analyze_rconst_moment(ucdf, k_sq_fit, bilayerDict):
                                               **bilayerDict) # Using this only for k_eq
 
         # Use only data nera zero crossings!
-        nearZeroIndices = find_near_zero_indices(unitData.load)
+        nearZeroIndices = find_near_zero_indices(unitData.load, window=100)
         maxStrain = 0.175
         maxIndex = np.where(unitData.strain > maxStrain)[0][0]
         nearZeroIndices = [i for i in nearZeroIndices if i < maxIndex]
+        
+        plt.figure()
+        plt.plot(unitData.strain, unitData.load, 'k')
+        plt.plot(unitData.strain[nearZeroIndices], unitData.load[nearZeroIndices], 'ro', linewidth=0)
 
         p_given = [unitModel.total_angle, unitModel.k_eq, unitData.d/2]
-        p_fit_moment_individual[count] = model.approximate_only_magnet(unitData.disp[nearZeroIndices],
-                                                                       -unitData.load[nearZeroIndices],
+        p_fit_moment_individual[count] = model.approximate_only_magnet(unitData.disp[:maxIndex],
+                                                                       -unitData.load[:maxIndex],
                                                                        p_guess, p_given)
         count += 1
 
@@ -309,13 +351,15 @@ def residue_constant_ksq(p, ksq_fit_individual, ucdf, p_lim=[0,0], limFlag='exp'
 
     k_sq = p
     ksq_fit_all = np.zeros(len(ucdf))
+    count = 0
     for index, row in ucdf.iterrows():
         unitData = row["data"]
         unitModel = metamat.MetamaterialModel(unitData.h, unitData.r, ANGLE_NEAR_ZERO,
                                               T=unitData.T, d=unitData.d, s=unitData.s, 
-                                              k_sq=k_sq, p_lim=p_lim,
+                                              k_sq=k_sq, p_lim=p_lim, m=unitData.m,
                                               hasMagnets=bool(unitData.magnets))
-        ksq_fit_all[index] = unitModel.k_eq
+        ksq_fit_all[count] = unitModel.k_eq
+        count += 1
 
     residual = ksq_fit_individual - ksq_fit_all
 
@@ -373,10 +417,6 @@ def residue_constant_collision(p, ucdf, params_given, limFlag='exp'):
 
         # Use only data nera zero crossings!
         nearZeroIndices = find_near_zero_indices(unitData.load, window=30)
-                
-        plt.figure()
-        plt.plot(unitData.strain, unitData.load, 'k')
-        plt.plot(unitData.strain[nearZeroIndices], unitData.load[nearZeroIndices], 'ro', linewidth=0)
         
         p_given = [unitModel.total_angle, unitModel.k_eq, unitData.d/2, m_fit]
         p_guess = p

@@ -263,59 +263,115 @@ class MetamaterialModel:
             barriers and differences between them, and determine what phases
             are present '''  
         
-        minIndex = signal.argrelmin(energy)[0]
-        maxIndex = signal.argrelmax(energy)[0]
+        q_crit = np.arccos(1-0.24) # Consider only local maxima occuring before this point
+        plimL = np.where(q_range > -q_crit)[0][0]
+        plimR = np.where(q_range > q_crit)[0][0]
+        if all(self.p_lim):
+            minIndex = signal.argrelmin(energy)[0]
+            maxIndex = signal.argrelmax(energy)[0]
+        else:
+            minIndex = signal.argrelmin(energy[plimL:plimR])[0]
+            maxIndex = signal.argrelmax(energy[plimL:plimR])[0]            
         minLoc = q_range[minIndex]
+        maxLoc = q_range[maxIndex]
         numMin = len(minIndex)
+        numMax = len(maxIndex)
                 
         phase = -1 # 0 = LCR; 1,2,3 = LR,LC,CR; 4,5,6 = L,C,R
         locGuess = [-np.pi/4, self.total_angle, np.pi/4]
-        
-        if numMin == 0:
-            print('WARNING: numMin = {0}... assuming LR bistable.'.format(numMin))
-            return 2, [], 1, [], [] 
-        elif numMin > 3:
-            print('WARNING: numMin = {0}... will return empty lists instead of analyzing.'.format(numMin))
-            return numMin, [], 1, [], []
-        
-        # Compute energy barriers for minima and energy differences between minima
-        if numMin == 3:
-            # Tristable: three local minima at left, center, and right (LCR)
-            diff_CL = (energy[minIndex[1]] - energy[minIndex[0]])
-            diff_CR = (energy[minIndex[1]] - energy[minIndex[2]])
-            ratio_LR  = (diff_CL - diff_CR)/(diff_CL + diff_CR) #xi from paper    
-
-            barrier_CL = (energy[maxIndex[0]] - energy[minIndex[1]])
-            barrier_CR = (energy[maxIndex[1]] - energy[minIndex[1]])
-
-            phase = 0
+      
+        # If p_lim is defined, directly use local minima to determine stability
+        if all(self.p_lim):
+            if numMin == 0:
+                print('WARNING: numMin = {0}... assuming LR bistable.'.format(numMin))
+                return 2, [], 1, [], [] 
+            elif numMin > 3:
+                print('WARNING: numMin = {0}... will return empty lists instead of analyzing.'.format(numMin))
+                return numMin, [], 1, [], []
             
-            diffs = [diff_CL, diff_CR, ratio_LR]
-            barriers = [barrier_CL, barrier_CR]
-        
-        elif numMin == 2:
-            # Bistable: two local minima (CL, CR, or LR)
-            iLoc1 = (np.abs(locGuess - minLoc[0])).argmin()
-            iLoc2 = (np.abs(locGuess - minLoc[1])).argmin()
-            if iLoc1 == 0 and iLoc2 == 2:
+            # Compute energy barriers for minima and energy differences between minima
+            if numMin == 3:
+                # Tristable: three local minima at left, center, and right (LCR)
+                diff_CL = (energy[minIndex[1]] - energy[minIndex[0]])
+                diff_CR = (energy[minIndex[1]] - energy[minIndex[2]])
+                ratio_LR  = (diff_CL - diff_CR)/(diff_CL + diff_CR) #xi from paper    
+    
+                barrier_CL = (energy[maxIndex[0]] - energy[minIndex[1]])
+                barrier_CR = (energy[maxIndex[1]] - energy[minIndex[1]])
+    
+                phase = 0
+                
+                diffs = [diff_CL, diff_CR, ratio_LR]
+                barriers = [barrier_CL, barrier_CR]
+            
+            elif numMin == 2:
+                # Bistable: two local minima (CL, CR, or LR)
+                iLoc1 = (np.abs(locGuess - minLoc[0])).argmin()
+                iLoc2 = (np.abs(locGuess - minLoc[1])).argmin()
+                if iLoc1 == 0 and iLoc2 == 2:
+                    phase = 1
+                elif iLoc1 == 0:
+                    phase = 2
+                elif iLoc2 == 2:
+                    phase = 3
+                assert phase != -1, 'something is very wrong with this sorting'
+                
+                diff = energy[minIndex[0]] - energy[minIndex[1]]  
+                barrier = energy[maxIndex[0]] - energy[minIndex[1]]
+                diffs = [diff]
+                barriers = [barrier]
+            
+            else:
+                # Monostable: single local minimum (L, C, or R)   
+                pvals = [4, 5, 6]
+                iLoc = (np.abs(locGuess - q_range[minIndex[0]])).argmin()
+                phase = pvals[iLoc]
+                
+                diffs = []
+                barriers = []
+        else: # If p_lim is not defined, check if local max exists before max angle
+            if numMin == 0 and numMax == 0:
+                # Monostable L or R
+                pointL = np.where(q_range > -np.pi/8)[0][0]
+                pointR = np.where(q_range > np.pi/8)[0][0]
+                if energy[pointL] < energy[pointR]:
+                    phase = 4
+                else:
+                    phase = 6
+            elif numMin == 1 and numMax == 0:
+                # Monostable C
+                phase = 5
+            elif numMin == 0 and numMax == 1:
+                # Bistable LR
                 phase = 1
-            elif iLoc1 == 0:
-                phase = 2
-            elif iLoc2 == 2:
-                phase = 3
-            assert phase != -1, 'something is very wrong with this sorting'
-            
-            diff = energy[minIndex[0]] - energy[minIndex[1]]  
-            barrier = energy[maxIndex[0]] - energy[minIndex[1]]
-            diffs = [diff]
-            barriers = [barrier]
-        
-        else:
-            # Monostable: single local minimum (L, C, or R)   
-            pvals = [4, 5, 6]
-            iLoc = (np.abs(locGuess - q_range[minIndex[0]])).argmin()
-            phase = pvals[iLoc]
-            
+            elif numMin == 1 and numMax == 1:
+                # Bistable CR or CL
+                pointL = np.where(q_range > -np.pi/8)[0][0]
+                pointR = np.where(q_range > np.pi/8)[0][0]
+                if energy[pointL] < energy[pointR]:
+                    phase = 2
+                else:
+                    phase = 3
+            elif numMin == 1 and numMax == 2:
+                # Tristable: three local minima at left, center, and right (LCR)  
+                phase = 0
+            elif numMin == 1:
+                # Bistable: two local minima (CL, CR, or LR)
+                iLoc1 = (np.abs(locGuess - minLoc[0])).argmin()
+                iLoc2 = (np.abs(locGuess - minLoc[1])).argmin()
+                if iLoc1 == 0 and iLoc2 == 2:
+                    phase = 1
+                elif iLoc1 == 0:
+                    phase = 2
+                elif iLoc2 == 2:
+                    phase = 3
+                assert phase != -1, 'something is very wrong with this sorting'
+                
+                diff = energy[minIndex[0]] - energy[minIndex[1]]  
+                barrier = energy[maxIndex[0]] - energy[minIndex[1]]
+                diffs = [diff]
+                barriers = [barrier]
+                
             diffs = []
             barriers = []
         

@@ -101,18 +101,20 @@ if __name__ == "__main__":
     #%% Run analysis on r-const force-displacement data
     section_header('unit cell constant-r force')
     sourcedir = os.path.join(rawdir,"unitCell_properties/unitCell_tension_rconst")
-    r_avg, ucdf = force.import_rconst_data(sourcedir, bilayerDict)
+    r_avg, ucdf = force.import_rconst_data(sourcedir, bilayerDict, m=moment)
     #r_avg, ucdf = force.import_rconst_data(sourcedir, setStartLoadToZero=True)#, bilayerDict)
     
     #%% Find best-fit square stiffness for r-const data
     item_header("Finding best-fit k_sq")
-    ksq_fit = force.analyze_rconst_nomagnets(ucdf, bilayerDict)
+    #ksq_fit = force.analyze_rconst_nomagnets(ucdf, bilayerDict)
+    ksq_fit = force.analyze_rconst_ksq(ucdf, bilayerDict)
     print("k_sq_fit: {0}".format(ksq_fit))
+    #moment_fit = moment
 
     #%% Find best-fit magnetic moment and collision parameters for r-const data
     item_header("Finding best-fit moment and p_lim")
     
-    limFlag='exp'
+
     
     """
     # This version also does not work
@@ -137,11 +139,12 @@ if __name__ == "__main__":
         
     moment_fit = force.analyze_rconst_moment(ucdf, ksq_fit, bilayerDict)
     print("m_fit: {0}".format(moment_fit))
-    p_lim_fit = force.analyze_rconst_collision(ucdf, ksq_fit, moment_fit, bilayerDict)
-    print("p_lim_fit: {0}".format(p_lim_fit))
+    #p_lim_fit = force.analyze_rconst_collision(ucdf, ksq_fit, moment_fit, bilayerDict)
+    #print("p_lim_fit: {0}".format(p_lim_fit))
     
     #%% Plot resulting best-fit curves
     # Commented out are the best-fit parameters found once upon a time...
+    limFlag='exp'
     """
     ksq_fit = 0.005765489237871801
     moment_fit = 0.1897092016810536
@@ -150,7 +153,8 @@ if __name__ == "__main__":
     
     item_header("Plotting resulting fit for r_const load-disp data")  
 
-    force.plot_final_rconst_fit(ucdf, ksq_fit, moment_fit, p_lim_fit,bilayerDict, limFlag=limFlag)
+    p_lim_fit = [0,0]
+    force.plot_final_rconst_fit(ucdf, ksq_fit, moment_fit, p_lim_fit, bilayerDict, limFlag=limFlag)
 
 
     #%% Run analysis on repeatability force-displacement data, using fits from r-const data

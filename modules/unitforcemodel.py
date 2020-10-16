@@ -114,6 +114,9 @@ def force_displacement_magnet_collision(x, p, q0, kq, L, flag='exp'):
     F = M/(2*L*np.cos(q))
     return F
 
+def force_displacement_all(x, p, q0, L, m, p_lim, flag='exp'):
+    return force_displacement_magnet_collision(x, [m, p_lim[0], p_lim[1]], q0, p, L, flag=flag)
+
 # three fitting parameters; assume q0, L are design parameters, and kq is known
 def force_displacement_nomagnet(x, p, q0, L, flag='pcw'):
     ''' Defines force(disp) function '''
@@ -147,6 +150,9 @@ def force_displacement_magnet_collision_for_fit(x, moment, p1, p2, q0=0, kq=0, L
 #%% Analysis ------------------------------------------------------------------
 def residue_force_displacement_spring(p, y, x, q0, L):
     return (y - force_displacement_spring(x, p, q0, L))
+
+def residue_force_displacement_spring_from_all(p, y, x, q0, L, m, p_lim, flag='exp'):
+    return (y - force_displacement_all(x, p, q0, L, m, p_lim, flag=flag))
 
 def residue_force_displacement_nomagnet(p, y, x, q0, L, flag='pcw'):
     return (y - force_displacement_nomagnet(x, p, q0, L, flag=flag))
@@ -398,6 +404,33 @@ def approximate_only_spring(disp, force, p_guess, p_given, figFlag=False, titles
                               titlestr='Torsional spring estimate'+titlestr)
 
     return kq
+
+def approximate_spring_from_full(disp, force, p_guess, p_given, figFlag=False, titlestr=''):
+    ''' Given some known parameters p_given, determine fitting parameters p_guess '''
+    
+    q0, L = p_given
+
+    disp_plt = 2*L - disp
+    cropIndex = np.argwhere(disp_plt<0.004)[0][0]
+    disp_fit = disp[cropIndex:]
+    force_fit = force[cropIndex:]
+    
+    # Fit to model
+    p_fit = opt.least_squares(residue_force_displacement_spring, p_guess,
+                                      args=(force_fit, disp_fit, q0, L))
+    kq = p_fit.x[0]
+    paramstr = "kq: {0:.4f} N/m".format(kq)
+    
+    force_model = force_displacement_spring(disp, kq, q0, L)  
+    energy_model = np.cumsum(force_model)
+    energy_model = energy_model - energy_model[0]
+    
+    if figFlag:
+        plot_force_and_energy(disp_plt, force, force_model, energy_model*1e-3,
+                              titlestr='Torsional spring estimate'+titlestr)
+
+    return kq
+
 
 def approximate_ksq_and_s(disp, force, p_guess, p_given, preCropped=False, figFlag=True, titlestr=''):
     ''' Given some known parameters p_given, determine fitting parameters p_guess '''
