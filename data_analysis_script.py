@@ -39,6 +39,7 @@ if __name__ == "__main__":
     cleandir = os.path.join(cwd,"data/cleaned")
     tmpdir = os.path.join(cwd,"tmp")
     savedir = os.path.join(cwd,"results/figures_from_script")
+    resdir = os.path.join(cwd,"results")
 
     #%% Get PDMS modulus 
     section_header('PDMS')
@@ -194,15 +195,19 @@ if __name__ == "__main__":
     r_range = np.array([r_avg]) #r_const average value
     h_range = 1e-3*np.arange(0.7,2.1,0.01)
     thetaL_range = np.radians(np.arange(-15.0,15.1,0.1))
-    T_range = np.array([25.0, 45.0, 78.0])#np.arange(25.0,105.0,5.0)
-    unit.analyze_composites(r_range=r_range,
+    #T_range = np.array([25.0, 45.0, 78.0])
+    T_range = np.arange(25.0,105.0,5.0)
+    
+    minima, phases, thetaT, theta0, paramDict, sampleModel = unit.run_composite_phase_boundary_analysis(r_avg,
                             h_range=h_range,
                             thetaL_range=thetaL_range,
                             T_range=T_range,
                             k_sq=ksq_fit, m=moment_fit, p_lim=p_lim_fit,
                             bilayerDict=bilayerDict,
-                            savedir=tmpdir, closeFlag=False) 
-    
+                            savedir=resdir, closeFlag=False)
+    boundaries, boundaryVals, boundaryData = unit.find_3D_phase_boundaries(r_avg,
+                            h_range=h_range, thetaL_range=thetaL_range, T_range=T_range,
+                            minima=minima, phases=phases, angleT_vals=thetaT, angle0_vals=theta0)
     
     
     

@@ -414,38 +414,59 @@ def analyze_composite_phases(r, h_range=1e-3*np.arange(0.5,2.1,0.01),
                     
     return numMin_array, phases_array, angleT_array, angle0_array
  
-def analyze_composites(r_range=np.arange(0.1,0.95,0.1),
+def run_composite_phase_boundary_analysis(r_val,
                        h_range=1e-3*np.arange(0.5,2.1,0.01),
                        thetaL_range=np.radians(np.arange(-15.0,15.1,0.1)),
                        T_range=np.arange(25.0,105.0,25.0),
                        b=[], k_sq=0.0, m=0.1471, limFlag='exp', p_lim=[3e-22, 51],
                        bilayerDict={},
-                       savedir='', closeFlag=True):
+                       savedir='', datestr='', closeFlag=True):
     ''' FULL PHASE ANALYSIS '''
     
-    datestr = datetime.today().strftime('%Y%m%d')
+    if datestr == '':
+        datestr = datetime.today().strftime('%Y%m%d')
+        
+    parameter_file = os.path.join(savedir, '{0}_parameters.csv'.format(datestr))
+    metamaterial_file = os.path.join(savedir, '{0}_metamaterialObject.npy'.format(datestr))
+    minima_file = os.path.join(savedir, '{0}_r{1:.3f}_minima.npy'.format(datestr, r_val))
+    phases_file = os.path.join(savedir, '{0}_r{1:.3f}_phases.npy'.format(datestr, r_val))
+    thetaT_file = os.path.join(savedir, '{0}_r{1:.3f}_thetaT.npy'.format(datestr, r_val))
+    theta0_file = os.path.join(savedir, '{0}_r{1:.3f}_theta0.npy'.format(datestr, r_val))
+    boundaries_file = os.path.join(savedir, '{0}_boundaries.csv'.format(datestr))
+    boundaryVals_file = os.path.join(savedir, '{0}_boundaryVals.csv'.format(datestr))
+    boundaryData_file = os.path.join(savedir, '{0}_boundaryData.csv'.format(datestr))
     
-    #t0 = time.perf_counter()
-    for i,r in enumerate(r_range):
-        #sys.stdout.write("\rMapping parameter space: analyzing {0}/{1} composites at {2:.2f} hours".format(i+1, len(r_range), (time.perf_counter()-t0)/3600.0))
-        #sys.stdout.flush()
-        numMin, phases, thetaT, theta0 = analyze_composite_phases(r, h_range=h_range, thetaL_range=thetaL_range, T_range=T_range,
+    # Load existing data if previously run
+    try:
+        print("Try loading previous parameter-space analysis...")
+        r_val, T_range, h_range, thetaL_range = import_parameters(parameter_file)
+        minima = np.load(minima_file)
+        phases = np.load(phases_file)
+        thetaT = np.load(thetaT_file)
+        theta0 = np.load(theta0_file)
+        sampleModel = np.load(metamaterial_file)
+        print("\tLoaded parameters, minima, phases, theta_T, and theta_0")
+    except IOError:
+        export_parameters(parameter_file, r_val, T_range, h_range, thetaL_range) #UPDATE THIS FUNCTION
+        sampleModel = MetamaterialModel(1e-3, r_val, 0.0, T=25.0, k_sq=k_sq, m=m, p_lim=p_lim, **bilayerDict)
+        np.save(metamaterial_file, sampleModel)
+        print("\tRunning new parameter-space analysis...")
+        minima, phases, thetaT, theta0 = analyze_composite_phases(r_val, h_range=h_range, thetaL_range=thetaL_range, T_range=T_range,
                                                                   b=b, k_sq=k_sq, m=m, limFlag=limFlag, p_lim=p_lim, bilayerDict=bilayerDict)
         for T in T_range:
-            plot_isotherm(r, T, phases, theta0, h_range=h_range, thetaL_range=thetaL_range,
+            plot_isotherm(r_val, T, phases, theta0, h_range=h_range, thetaL_range=thetaL_range,
                           T_range=T_range, savedir=savedir, closeFlag=closeFlag)
-
-        minima_file = os.path.join(savedir, '{0}_r{1:.3f}_minima.npy'.format(datestr, r))
-        phases_file = os.path.join(savedir, '{0}_r{1:.3f}_phases.npy'.format(datestr, r))
-        thetaT_file = os.path.join(savedir, '{0}_r{1:.3f}_thetaT.npy'.format(datestr, r))
-        theta0_file = os.path.join(savedir, '{0}_r{1:.3f}_theta0.npy'.format(datestr, r))
-
-        np.save(minima_file, numMin, allow_pickle=False)
+        print("\tSaving parameters, minima, phases, theta_T, and theta_0")
+        np.save(minima_file, minima, allow_pickle=False)
         np.save(phases_file, phases, allow_pickle=False)
         np.save(thetaT_file, thetaT, allow_pickle=False)
         np.save(theta0_file, theta0, allow_pickle=False)
-    export_parameters(os.path.join(savedir, '{0}_analysis_parameters.npy'.format(datestr)),
-                      thetaL_range, T_range, h_range, r_range)
+
+    if datestr == '':
+        return minima, phases, thetaT, theta0
+    else:
+        paramDict = {'r':r_val, 'T':T_range, 'h':h_range, 'theta_L':thetaL_range}
+        return minima, phases, thetaT, theta0, paramDict, sampleModel
 
 
 def analyze_h_T_relation(r, h_range=1e-3*np.arange(0.5,2.1,0.001),
@@ -554,28 +575,28 @@ def analyze_diagonal_dependence(h_val, ratio_val, thetaL_val,
 
 
 ''' Export parameters used to map parameter space '''
-def export_parameters(filename, thetaL, T, h, r):
+def export_parameters(filename, r, T, h, thetaL):
     with open(filename, 'w') as f:
-        f.write(", ".join(map(str, thetaL)) + "\n")
+        f.write("{0:.3f}\n".format(r))
         f.write(", ".join(map(str, T)) + "\n")
         f.write(", ".join(map(str, h)) + "\n")
-        f.write(", ".join(map(str, r)) + "\n")
+        f.write(", ".join(map(str, thetaL)) + "\n")
 
 
 ''' Import parameters used for previously-calculated parameter-space analysis '''
 def import_parameters(filename):
-    with open(filename, 'w') as f:
+    with open(filename, 'r') as f:
         p = f.readlines()
-        thetaL = [ n.split(',') for n in p[0] ]
+        r = p[0]
         T = [ n.split(', ') for n in p[1] ]
         h = [ n.split(',') for n in p[2] ]
-        r = [ n.split(',') for n in p[3] ]
+        thetaL = [ n.split(',') for n in p[3] ]
 
     print("Imported the following parameters:")
     print("thetaL \t ({0}:{1}), length {2}".format(thetaL[0],thetaL[-1],len(thetaL)))
     print("T \t ({0}:{1}), length {2}".format(T[0],T[-1],len(T)))
     print("h \t ({0}:{1}), length {2}".format(h[0],h[-1],len(h)))
-    print("r \t ({0}:{1}), length {2}".format(r[0],r[-1],len(r)))
+    print("r = {0}".format(r))
 
     return thetaL, T, h, r
 
@@ -600,6 +621,7 @@ def find_3D_phase_boundaries(r, h_range=1e-3*np.arange(0.5,2.1,0.01),
     # Find where changes in phase occur
     diffs = np.diff(phases)
     boundaries = np.argwhere(diffs != 0)
+    print(boundaries.shape)
     N = max(boundaries.shape) # Number of points found located at boundary
     boundaryVals = np.zeros(N)
     for pt in range(N):
@@ -608,7 +630,7 @@ def find_3D_phase_boundaries(r, h_range=1e-3*np.arange(0.5,2.1,0.01),
         max_diff = 0
         check = [-1,0,1]
         vals = np.zeros(9,dtype=int)
-        if not ((-1 in loc) or loc[0] == phases.shape[0]-1 or loc[1] == phases.shape[1]-1 or loc[2] == phases.shape[3]-1):
+        if not ((-1 in loc) or loc[0] == phases.shape[0]-1 or loc[1] == phases.shape[1]-1 or loc[2] == phases.shape[2]-1):
             count = 0
             for i in check:
                 for j in check:
@@ -636,9 +658,9 @@ def find_3D_phase_boundaries(r, h_range=1e-3*np.arange(0.5,2.1,0.01),
             boundaryVals[pt] = 5
 
     # Join and sort boundary information by value
-    boundaryT = np.array([T_range[i] for i in boundaries[:,0]]).reshape((-1,1))
-    boundaryh = np.array([1000*h_range[i] for i in boundaries[:,1]]).reshape((-1,1))
-    boundarytheta = np.array([np.degrees(thetaL_range[i]) for i in boundaries[:,2]]).reshape((-1,1))
+    boundaryT = np.array([T_range[i] for i in boundaries[:,2]]).reshape((-1,1))
+    boundaryh = np.array([1000*h_range[i] for i in boundaries[:,0]]).reshape((-1,1))
+    boundarytheta = np.array([np.degrees(thetaL_range[i]) for i in boundaries[:,1]]).reshape((-1,1))
 
     boundaryVals = boundaryVals.reshape((-1,1))
     boundaryData = np.concatenate((boundaryT, boundaryh, boundarytheta, boundaryVals), axis=1)
@@ -679,7 +701,8 @@ def plot_isotherm(r, T, phases, angle0_vals,
         plt.close()
 
     return
-    
+   
+
 #%%
 
 def test_MetamaterialModel(h_total, ratio, thetaL, T):
