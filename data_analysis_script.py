@@ -196,7 +196,9 @@ if __name__ == "__main__":
     h_range = 1e-3*np.arange(0.7,2.1,0.01)
     thetaL_range = np.radians(np.arange(-15.0,15.1,0.1))
     #T_range = np.array([25.0, 45.0, 78.0])
-    T_range = np.arange(25.0,105.0,5.0)
+    T_range = np.arange(25.0,100.5,0.5)
+    
+    datestr = '20201019'
     
     minima, phases, thetaT, theta0, paramDict, sampleModel = unit.run_composite_phase_boundary_analysis(r_avg,
                             h_range=h_range,
@@ -204,12 +206,13 @@ if __name__ == "__main__":
                             T_range=T_range,
                             k_sq=ksq_fit, m=moment_fit, p_lim=p_lim_fit,
                             bilayerDict=bilayerDict,
-                            savedir=resdir, closeFlag=False)
+                            savedir=resdir, closeFlag=False, datestr=datestr)
+    
     boundaries, boundaryVals, boundaryData = unit.find_3D_phase_boundaries(r_avg,
                             h_range=h_range, thetaL_range=thetaL_range, T_range=T_range,
                             minima=minima, phases=phases, angleT_vals=thetaT, angle0_vals=theta0)
     
-    
+    unit.save_boundaries(datestr, resdir, boundaries, boundaryData, boundaryVals)
     
     
     

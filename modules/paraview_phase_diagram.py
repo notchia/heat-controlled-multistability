@@ -183,10 +183,13 @@ def render_surfaces(fnameList):
 if __name__ == "__main__":
     basepath = 'C:/Users/lucia/Documents/Research/heat-controlled_multistability/results/'
     
-    values = [0,1,2,3,5,6]
+    datestr = '20201019' #'20200422' #
+    
+    #values = [0,1,2,3,5,6]
+    values = [0,1,2,3,6]
     fnameList = []
     for value in values:
-        fname = os.path.join(basepath, '20200422_boundaryData_{0}.vtk'.format(value))
+        fname = os.path.join(basepath, '{0}_boundaryData_{1}.vtk'.format(datestr, value))
         fnameList.append(fname)
     render_surfaces(fnameList)
     #pv.WriteImage("test.png")

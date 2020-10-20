@@ -587,10 +587,10 @@ def export_parameters(filename, r, T, h, thetaL):
 def import_parameters(filename):
     with open(filename, 'r') as f:
         p = f.readlines()
-        r = p[0]
-        T = [ n.split(', ') for n in p[1] ]
-        h = [ n.split(',') for n in p[2] ]
-        thetaL = [ n.split(',') for n in p[3] ]
+        r = p[0].strip('\n')
+        T = p[1].strip('\n').split(', ')
+        h = p[2].strip('\n').split(', ')
+        thetaL = p[3].strip('\n').split(', ')
 
     print("Imported the following parameters:")
     print("thetaL \t ({0}:{1}), length {2}".format(thetaL[0],thetaL[-1],len(thetaL)))
@@ -598,7 +598,12 @@ def import_parameters(filename):
     print("h \t ({0}:{1}), length {2}".format(h[0],h[-1],len(h)))
     print("r = {0}".format(r))
 
-    return thetaL, T, h, r
+    thetaL = [float(x) for x in thetaL]
+    T = [float(x) for x in T]
+    h = [float(x) for x in h]
+    r = float(r)
+
+    return r, T, h, thetaL
 
 def export_to_csv(filename, data, variables=[], units=[], fmt='%0.18e'):
     if variables != [] and units != []:
@@ -702,6 +707,68 @@ def plot_isotherm(r, T, phases, angle0_vals,
 
     return
    
+
+def save_boundaries(datestr, cwd, boundaries, boundaryData, boundaryVals):
+    ''' Given boundary values, save to csv and vtk '''
+    boundaries_file = os.path.join(cwd, '{0}_boundaries.csv'.format(datestr))
+    boundaryVals_file = os.path.join(cwd, '{0}_boundaryVals.csv'.format(datestr))
+    boundaryData_file = os.path.join(cwd, '{0}_boundaryData.csv'.format(datestr))
+    
+    export_to_csv(boundaries_file, boundaries, fmt='%d',
+                  variables=["T index", "h index", "thetaL index"],
+                  units=["index","index","index"])
+    export_to_csv(boundaryData_file, boundaryData, fmt=['%0.1f','%0.4f','%0.2f','%0.1f'],
+                  variables=["T", "h", "thetaL", "value"],
+                  units=["degrees C","mm","degrees","id number"])
+    np.savetxt(boundaryVals_file, boundaryVals, delimiter=', ', fmt='%0.1f', header='Boundary values')
+    
+    # Export a file for each surface, except for points labeled nan
+    boundarySurfaces = np.split(boundaryData, np.where(np.diff(boundaryData[:,-1]))[0]+1)
+    nanCounter = 0
+    for surface in boundarySurfaces:
+        value = surface[0,-1]
+        if not np.isnan(value):
+            fname = os.path.join(cwd, '{0}_boundaryData_{1}.csv'.format(datestr,int(value)))
+            export_to_csv(fname, surface[:,0:-1], fmt=['%0.1f','%0.4f','%0.2f'],
+                          variables=["T", "h", "thetaL"],
+                          units=["degrees C","mm","degrees"]
+                          )
+            csv2vtk(fname)
+        else:
+            nanCounter += 1
+    print("nan count: {0}".format(nanCounter))
+    return
+
+
+
+def csv2vtk(fname):
+    ''' Create vtk file of unstructured grid type from csv array '''
+    basename = os.path.splitext(fname)[0]
+    value = int(basename[-1]) # Get surface number from filename
+    points = np.genfromtxt(fname,delimiter=", ",skip_header=1)
+    z, x, y = points[:,0], points[:,1], points[:,2]
+    nPoints = len(x)
+    
+    with open(basename + ".vtk", "w") as f:
+        f.write("# vtk DataFile Version 2.0\n")
+        f.write(basename + "\n")
+        f.write("ASCII\n")
+        f.write("DATASET UNSTRUCTURED_GRID\n")
+        f.write("POINTS {0} float\n".format(nPoints))
+        for i in range(nPoints):
+            f.write("{0} {1} {2}\n".format(x[i],y[i],z[i]))
+        f.write("CELLS {0} {1}\n".format(nPoints, 2*nPoints))
+        for i in range(nPoints):
+            f.write("1 {0}\n".format(i))
+        f.write("CELL_TYPES {0}\n".format(nPoints))
+        for i in range(nPoints):
+            f.write("1\n")
+        f.write("POINT_DATA {0}\n".format(nPoints))
+        f.write("SCALARS point_scalars float\n")
+        f.write("LOOKUP_TABLE default\n")
+        for i in range(0, nPoints):
+            f.write("{0}\n".format(value))
+    return()
 
 #%%
 
