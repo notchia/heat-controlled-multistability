@@ -23,6 +23,8 @@ def render_surface(fname):
 
     gridScale = [45, 2, 1]
     figureSize = [1200, 900]
+
+
     
     # Import VTK file and initialize render view
     boundaryVTK = pv.LegacyVTKReader(FileNames=[fname])
@@ -42,6 +44,13 @@ def render_surface(fname):
     
     # Get color transfer function/color map for 'point_scalars'
     scalarsLookupTable = pv.GetColorTransferFunction('point_scalars')
+    # Explicitly specify color map control points as flattened list of tuples:
+    # (data_value, red, green, blue) with color components in range [0.0, 1.0]
+    scalarsLookupTable.RGBPoints = [0, 0.2, 0.2, 0.2,
+                                    1, 0.35, 0.35, 0.35,
+                                    2, 0.5, 0.5, 0.5,
+                                    3, 0.7, 0.7, 0.7,
+                                    6, 0.9, 0.9, 0.9]
     
     ''' Create a new Delaunay 2D triangular mesh '''
     triangleMesh = pv.Delaunay2D(Input=boundaryVTK)
