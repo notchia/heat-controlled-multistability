@@ -623,15 +623,17 @@ def find_3D_phase_boundaries(r, h_range=1e-3*np.arange(0.5,2.1,0.01),
                              minima=[], phases=[], angleT_vals=[], angle0_vals=[]):   
     ''' Find locations of phase boundaries for a given composite '''
 
-    # Find where changes in phase occur
+    # Find where changes in phase occur *along temperature axis*
     diffs = np.diff(phases)
     boundaries = np.argwhere(diffs != 0)
-    print(boundaries.shape)
     N = max(boundaries.shape) # Number of points found located at boundary
     boundaryVals = np.zeros(N)
     for pt in range(N):
+        # Get h, thetaL, T, and phase value [0-6] at boundary point
         loc = [boundaries[pt,0], boundaries[pt,1], boundaries[pt,2]]
         val = phases[loc[0],loc[1],loc[2]]
+        # Find maximum phase difference between boundary point and all nearest
+        # neighbors *in isotherm* (ignore points at end of range)
         max_diff = 0
         check = [-1,0,1]
         vals = np.zeros(9,dtype=int)

@@ -271,7 +271,7 @@ def render_isotherms(fnameList2):
 if __name__ == "__main__":
     basepath = 'C:/Users/lucia/Documents/Research/heat-controlled_multistability/results/'
     
-    datestr = '20201019' #'20200422' #
+    datestr = '20201027'#'20201019' #'20200422' #
     
     #values = [0,1,2,3,5,6]
     boundaryValues = [0,1,2,3,6]
