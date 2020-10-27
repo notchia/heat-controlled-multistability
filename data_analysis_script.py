@@ -166,9 +166,10 @@ if __name__ == "__main__":
 
     h_repeat = 1.71e-3
     r_repeat = 0.18
+    '''
     unit.analyze_h_T_relation(r_repeat, k_sq=ksq_fit, m=moment_fit, limFlag='exp', p_lim=[1e-14, 30],
                              bilayerDict=bilayerDict,
-                             saveFlag=SAVE_FLAG, figdir=savedir)
+                             saveFlag=SAVE_FLAG, figdir=savedir)'''
         
     #%% Generate additional manuscript figures: energy plots and 2D phase diagrams
     # Plot comparing change in total and spring energy with temperature (for Fig. 1)
@@ -184,10 +185,11 @@ if __name__ == "__main__":
     h_val = 1.2e-3
     ratio_val = 0.4
     thetaL_val = 0.0
+    '''
     unit.analyze_diagonal_dependence(h_val, ratio_val, thetaL_val,
                                 k_sq=ksq_fit, m=moment_fit, limFlag='exp', p_lim=p_lim_fit,#[1e-14, 30],
                                 bilayerDict=bilayerDict,
-                                saveFlag=SAVE_FLAG, figdir=savedir)
+                                saveFlag=SAVE_FLAG, figdir=savedir)'''
 
 
     #%% Generate and plot 3D phase diagram 
@@ -218,7 +220,7 @@ if __name__ == "__main__":
     
     unit.save_boundaries(datestr, resdir, boundaries, boundaryData, boundaryVals)
     
-    unit.save_isotherms(datestr, resdir, minima, i_isotherm, h_range, thetaL_range, T_range)
+    unit.save_isotherms(datestr, resdir, phases, i_isotherm, h_range, thetaL_range, T_range)
     
     
     

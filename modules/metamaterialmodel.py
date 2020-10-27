@@ -712,20 +712,17 @@ def save_isotherms(datestr, resdir, minima, i_isotherm, h_range, thetaL_range, T
     ''' Given i_isotherm corresponding to index in T_range for which to plot isotherms,
         save individual isothersm to csv and vtk '''
 
-    x = np.array([1000*h for h in h_range]).reshape((-1,1))
-    y = np.array([np.degrees(theta) for theta in thetaL_range]).reshape((-1,1))
-    xmesh, ymesh = np.meshgrid(x, y)
-    xvec = xmesh.reshape((-1,1))
-    yvec = ymesh.reshape((-1,1)) 
+    x = np.array([1000*h for h in h_range])#.reshape((-1,1))
+    y = np.array([np.degrees(theta) for theta in thetaL_range])#.reshape((-1,1))
+    #xmesh, ymesh = np.meshgrid(x, y)
+    #xvec = xmesh.reshape((-1,1))
+    #yvec = ymesh.reshape((-1,1)) 
         
     for count, index in enumerate(i_isotherm):
-        isotherm_vals = minima[:,:,index].reshape((-1,1))
-        isothermData = np.concatenate((xvec, yvec, isotherm_vals), axis=1)
-        isotherm_file = os.path.join(resdir, '{0}_isotherm_{1}.csv'.format(datestr, count))
-        export_to_csv(isotherm_file, isothermData, fmt=['%0.4f','%0.2f','%0.1f'],
-                      variables=["h", "thetaL","value"],
-                      units=["mm","degrees","value"])
-        csv2vtk(isotherm_file, isothermFlag=True, isothermT=T_range[index])
+        isotherm_vals = minima[:,:,index]#.reshape((-1,1))
+        #isothermData = np.concatenate((xvec, yvec, isotherm_vals), axis=1)
+        isotherm_file_base = os.path.join(resdir, '{0}_isotherm_{1}'.format(datestr, count))
+        data2vtk_rectilinear(x, y, T_range[index], isotherm_vals, isotherm_file_base)
     
     return
 
@@ -755,22 +752,46 @@ def save_boundaries(datestr, cwd, boundaries, boundaryData, boundaryVals):
             export_to_csv(fname, surface[:,0:-1], fmt=['%0.1f','%0.4f','%0.2f'],
                           variables=["T", "h", "thetaL"],
                           units=["degrees C","mm","degrees"])
-            csv2vtk(fname)
+            csv2vtk_unstructured(fname)
         else:
             nanCounter += 1
     print("nan count: {0}".format(nanCounter))
     return
 
+   
+def data2vtk_rectilinear(x, y, z_val, values, basename):
+    ''' Create vtk file of rectilinear grid type from x, y, array csv file '''  
+    nx = len(x)
+    ny = len(y)
+    nz = 1
+    
+    with open(basename + ".vtk", "w") as f:
+        f.write("# vtk DataFile Version 2.0\n")
+        f.write(basename + "\n")
+        f.write("ASCII\n")
+        f.write("DATASET RECTILINEAR_GRID\n")
+        f.write("DIMENSIONS {0} {1} {2}\n".format(nx, ny, nz))
+        f.write("X_COORDINATES {0} float\n".format(nx))
+        f.write(' '.join([str(val) for val in x]) + "\n")
+        f.write("Y_COORDINATES {0} float\n".format(ny))
+        f.write(' '.join([str(val) for val in y]) + "\n")
+        f.write("Z_COORDINATES {0} float\n".format(nz))
+        f.write("{0}\n".format(z_val))
+        f.write("POINT_DATA {0}\n".format(nx*ny))
+        f.write("SCALARS scalars float\n")
+        f.write("LOOKUP_TABLE default\n")
+        for j in range(ny):
+            for i in range(nx):
+                f.write("{0} ".format(values[i,j]))
+        f.write("\n")
+    return
 
-def csv2vtk(fname, isothermFlag=False, isothermT=0):
+def csv2vtk_unstructured(fname):
     ''' Create vtk file of unstructured grid type from csv array '''
     basename = os.path.splitext(fname)[0]
     points = np.genfromtxt(fname,delimiter=", ",skip_header=1)
-    if isothermFlag:
-        x, y, values = points[:,0], points[:,1], points[:,2]        
-    else:
-        value = int(basename[-1]) # Get surface number from filename
-        z, x, y = points[:,0], points[:,1], points[:,2]
+    value = int(basename[-1]) # Get surface number from filename
+    z, x, y = points[:,0], points[:,1], points[:,2]
     nPoints = len(x)
     
     with open(basename + ".vtk", "w") as f:
@@ -780,10 +801,7 @@ def csv2vtk(fname, isothermFlag=False, isothermT=0):
         f.write("DATASET UNSTRUCTURED_GRID\n")
         f.write("POINTS {0} float\n".format(nPoints))
         for i in range(nPoints):
-            if isothermFlag:
-                f.write("{0} {1} {2}\n".format(x[i],y[i],isothermT))
-            else:
-                f.write("{0} {1} {2}\n".format(x[i],y[i],z[i]))
+            f.write("{0} {1} {2}\n".format(x[i],y[i],z[i]))
         f.write("CELLS {0} {1}\n".format(nPoints, 2*nPoints))
         for i in range(nPoints):
             f.write("1 {0}\n".format(i))
@@ -794,11 +812,9 @@ def csv2vtk(fname, isothermFlag=False, isothermT=0):
         f.write("SCALARS point_scalars float\n")
         f.write("LOOKUP_TABLE default\n")
         for i in range(0, nPoints):
-            if isothermFlag:
-                f.write("{0}\n".format(values[i]))
-            else:
-                f.write("{0}\n".format(value))
-    return()
+            f.write("{0}\n".format(value))
+    return
+
 
 #%%
 

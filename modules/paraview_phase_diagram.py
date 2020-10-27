@@ -24,8 +24,7 @@ def render_surface(fname):
     gridScale = [45, 2, 1]
     figureSize = [1200, 900]
 
-
-    
+   
     # Import VTK file and initialize render view
     boundaryVTK = pv.LegacyVTKReader(FileNames=[fname])
     renderView = pv.GetActiveViewOrCreate('RenderView')
@@ -50,7 +49,7 @@ def render_surface(fname):
                                     1, 0.35, 0.35, 0.35,
                                     2, 0.5, 0.5, 0.5,
                                     3, 0.7, 0.7, 0.7,
-                                    6, 0.9, 0.9, 0.9]
+                                    6, 0.9, 0.9, 0.9]  
     
     ''' Create a new Delaunay 2D triangular mesh '''
     triangleMesh = pv.Delaunay2D(Input=boundaryVTK)
@@ -66,20 +65,6 @@ def render_surface(fname):
     renderView.Update()    
     
     loopSubdivision1Display = triangleMeshDisplay
-    #loopSubdivision1Display = warpByScalar1Display # DELETE THIS ONCE LOOP SUBDIVISON WORKS
-    
-    '''
-    # create a new 'Loop Subdivision' filter to increases the mesh granularity
-    loopSubdivision1 = pv.LoopSubdivision(Input=triangleMesh)
-    loopSubdivision1.NumberofSubdivisions = 2
-    
-    # Update view with new finer mesh; hide original mesh
-    loopSubdivision1Display = pv.Show(loopSubdivision1, renderView)
-    loopSubdivision1Display.Representation = 'Surface'
-    pv.Hide(triangleMeshDisplay, renderView) 
-    loopSubdivision1Display.SetScalarBarVisibility(renderView, True)
-    renderView.Update()
-    '''
     
     # Modify colorbar
     colorbar = pv.GetScalarBar(scalarsLookupTable, renderView)
@@ -94,12 +79,7 @@ def render_surface(fname):
     colorbar.TitleColor = textColor
     colorbar.LabelColor = textColor
         
-    #colorbar.UseCustomLabels = 1
-    #colorbar.CustomLabels = [-50.0, 0.0, 50.0]
     colorbar.AddRangeLabels = 0
-    
-    # Rescale transfer function
-    #scalarsLookupTable.RescaleTransferFunction(-ColormapScale, ColormapScale)
     
     # Get opacity transfer function/opacity map for 'point_scalars'
     scalarsPWF = pv.GetOpacityTransferFunction('point_scalars')
@@ -138,32 +118,127 @@ def render_surface(fname):
     renderView.AxesGrid.DataScale = gridScale
 
     renderView.Update() 
-    '''
-    # Display and format labels
-    text1 = pv.Text()
-    text1.Text = axisLabels[0]
-    text1Display = pv.Show(text1, renderView)
-    text1Display.Color = textColor
-    text1Display.WindowLocation = 'AnyLocation'
-    text1Display.Position = axisLocations[0]
-    text1Display.FontSize = fontSize
+
+    # current camera placement for renderView
+    renderView.CameraPosition = [-28.6, -29.2, 37.4]
+    renderView.CameraFocalPoint = [-0.97, 4.88, 11.31]
+    renderView.CameraViewUp = [0.29, 0.41, 0.85]
+    renderView.CameraParallelScale = 1   
+
+    pv.GetRenderView().ViewSize = figureSize
+
+    renderView.Update()    
+
+
+def render_isotherm(fname):
+    ''' Render a single surface, defined in the file fname '''
     
-    text2 = pv.Text()
-    text2.Text = axisLabels[1]
-    text2Display = pv.Show(text2, renderView)
-    text2Display.Color = textColor
-    text2Display.WindowLocation = 'AnyLocation'
-    text2Display.Position = axisLocations[1]
-    text2Display.FontSize = fontSize
+    fontSize = 16
+    textColor = [0,0,0] #black
     
-    text3 = pv.Text()
-    text3.Text = axisLabels[2]
-    text3Display = pv.Show(text3, renderView)   
-    text3Display.Color = textColor
-    text3Display.WindowLocation = 'AnyLocation'
-    text3Display.Position = axisLocations[2]
-    text3Display.FontSize = fontSize
-    '''
+    axisLabels = ['h (mm)', 'theta_L (deg)', 'T (C)']#['$h$ (mm)', '$\theta_L$ ($^{\circ}$)', '$T$ ($^{\circ}$C)']
+    axisLocations = [(0.65, 0.05), (0.15, 0.1), (0.0, 0.5)] # (x,y) from bottom left
+
+    gridScale = [45, 2, 1]
+    figureSize = [1200, 900]
+
+   
+    # Import VTK file and initialize render view
+    isothermVTK = pv.LegacyVTKReader(FileNames=[fname])
+    renderView = pv.GetActiveViewOrCreate('RenderView')
+    renderView.Background = [1,1,1]  #white
+    
+    isothermVTKDisplay = pv.Show(isothermVTK, renderView)
+    isothermVTKDisplay.Representation = 'Surface'
+    
+    # Reset view to fit data, hide orientation axes, changing interaction 
+    # mode based on data extents, show color bar/color legend
+    renderView.ResetCamera()
+    renderView.OrientationAxesVisibility = 0
+    renderView.InteractionMode = '3D'
+    isothermVTKDisplay.SetScalarBarVisibility(renderView, True)
+    renderView.Update()
+    
+    # Get color transfer function/color map for 'point_scalars'
+    scalarsLookupTable2 = pv.GetColorTransferFunction('scalars')
+    # Explicitly specify color map control points as flattened list of tuples:
+    # (data_value, red, green, blue) with color components in range [0.0, 1.0]
+    scalarsLookupTable2.RGBPoints = [0, 1.0, 71.0/255.0, 76.0/255.0, #light red
+                                     1, 118.0/255.0, 205.0/255.0, 38.0/255.0, #apple green
+                                     2, 118.0/255.0, 205.0/255.0, 38.0/255.0,
+                                     3, 118.0/255.0, 205.0/255.0, 38.0/255.0,
+                                     4, 6.0/255.0, 82.0/255.0, 1.0, #electric blue
+                                     5, 6.0/255.0, 82.0/255.0, 1.0,
+                                     6, 6.0/255.0, 82.0/255.0, 1.0]        
+    
+    ''' Create a new Delaunay 2D triangular mesh '''
+    planeMesh = pv.RectilinearGridGeometryFilter(isothermVTK)
+    
+    # Show mesh and colorbar, remove data points
+    planeMeshDisplay = pv.Show(planeMesh, renderView)
+    planeMeshDisplay.Representation = 'Surface'
+    pv.Hide(isothermVTK, renderView)
+    planeMeshDisplay.SetScalarBarVisibility(renderView, True)
+    renderView.Update()
+    
+    # update the view to ensure updated data information
+    renderView.Update()    
+    
+    loopSubdivision1Display = planeMeshDisplay
+    
+    # Modify colorbar
+    colorbar = pv.GetScalarBar(scalarsLookupTable2, renderView)
+    
+    # Modify colorbar properties
+    colorbar.AutoOrient = 0
+    colorbar.Orientation = 'Horizontal'
+    colorbar.Title = 'Isotherm "value"'
+    colorbar.TitleFontSize = fontSize
+    colorbar.LabelFontSize = fontSize
+    colorbar.RangeLabelFormat = '%-#1.2f'
+    colorbar.TitleColor = textColor
+    colorbar.LabelColor = textColor
+        
+    colorbar.AddRangeLabels = 0
+    
+    # Get opacity transfer function/opacity map for 'point_scalars'
+    scalarsPWF = pv.GetOpacityTransferFunction('point_scalars')
+    
+    # change scalar bar placement
+    colorbar.WindowLocation = 'AnyLocation'
+    colorbar.Position = [0.1, 0.90]
+    colorbar.ScalarBarLength = 0.2
+    
+    renderView.ResetCamera()
+    
+    # Modify axes grid properties 
+    renderView.AxesGrid.Visibility = 1
+    renderView.AxesGrid.GridColor = textColor
+    renderView.AxesGrid.ZLabelOpacity = 1
+    
+    loopSubdivision1Display.Scale = gridScale
+    
+    #renderView.AxesGrid.AxesToLabel = 3
+    renderView.AxesGrid.XTitle = axisLabels[0]
+    renderView.AxesGrid.YTitle = axisLabels[1]
+    renderView.AxesGrid.ZTitle = axisLabels[2]
+    renderView.AxesGrid.XTitleFontSize = 2*fontSize
+    renderView.AxesGrid.YTitleFontSize = 2*fontSize
+    renderView.AxesGrid.ZTitleFontSize = 2*fontSize
+    renderView.AxesGrid.XLabelFontSize = fontSize
+    renderView.AxesGrid.YLabelFontSize = fontSize
+    renderView.AxesGrid.ZLabelFontSize = fontSize
+    renderView.AxesGrid.XTitleColor = textColor
+    renderView.AxesGrid.YTitleColor = textColor
+    renderView.AxesGrid.ZTitleColor = textColor
+    renderView.AxesGrid.XLabelColor = textColor
+    renderView.AxesGrid.YLabelColor = textColor
+    renderView.AxesGrid.ZLabelColor = textColor
+    renderView.AxesGrid.ShowGrid = 1
+    renderView.AxesGrid.DataScale = gridScale
+
+    renderView.Update() 
+
     # current camera placement for renderView
     renderView.CameraPosition = [-28.6, -29.2, 37.4]
     renderView.CameraFocalPoint = [-0.97, 4.88, 11.31]
@@ -175,17 +250,21 @@ def render_surface(fname):
     renderView.Update()    
 
     
-def render_surfaces(fnameList):
+def render_boundaries(fnameList):
     ''' Render a series of surfaces on the same axes '''
     
-    for fname in fnameList:
-        render_surface(fname)
+    for i in range(len(fnameList)):
+        render_surface(fnameList[i])
         
     #pv.Render()
-    pv.Interact()
+    #pv.Interact()
 
-#def render_isotherm(fname):
-    ''' Render an isotherm at the location defined in the filename '''
+def render_isotherms(fnameList2):
+    ''' Render a series of surfaces on the same axes '''
+    
+    for i in range(len(fnameList2)):
+        render_isotherm(fnameList2[i])
+
 
 #--------------------------------------------------------------------------
 
@@ -195,13 +274,21 @@ if __name__ == "__main__":
     datestr = '20201019' #'20200422' #
     
     #values = [0,1,2,3,5,6]
-    values = [0,1,2,3,6]
+    boundaryValues = [0,1,2,3,6]
     fnameList = []
-    for value in values:
+    for value in boundaryValues:
         fname = os.path.join(basepath, '{0}_boundaryData_{1}.vtk'.format(datestr, value))
         fnameList.append(fname)
-    render_surfaces(fnameList)
+    isothermValues = [0,1,2]
+    fnameList2 = []
+    for value in isothermValues:
+        fname = os.path.join(basepath, '{0}_isotherm_{1}.vtk'.format(datestr, value))
+        fnameList2.append(fname)
+    render_isotherms(fnameList2)
+    render_boundaries(fnameList)
+
     #pv.WriteImage("test.png")
+    pv.Interact()
     pv.SaveScreenshot(os.path.join(basepath,'paraview.png'),pv.GetActiveView(),
                       TransparentBackground=1)
     
