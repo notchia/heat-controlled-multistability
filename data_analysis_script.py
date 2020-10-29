@@ -203,9 +203,29 @@ if __name__ == "__main__":
     T_isotherm = [25.0, 45.0, 78.0]
     i_isotherm = [np.argwhere(T_range == T_val)[0][0] for T_val in T_isotherm]
     
+    r_range = np.arange(0.0,1.0,0.005)
+    T_isotherm = [25.0, 55.0, 75.0]
+     
     #datestr = '20201019'  
-    datestr = ''
+
+    datestr = '20201028'
+    minimaMain, phasesMain, thetaTMain, theta0Main, paramDictMain, sampleModelMain = unit.run_main_parameter_phase_boundary_analysis(0.0,
+                            h_range=h_range,
+                            r_range=r_range,
+                            T_range=T_range,
+                            k_sq=ksq_fit, m=moment_fit, p_lim=p_lim_fit,
+                            bilayerDict=bilayerDict,
+                            savedir=resdir, closeFlag=False, datestr=datestr)
+
+    boundariesMain, boundaryValsMain, boundaryDataMain = unit.find_3D_phase_boundaries_main_params(0.0,
+                            h_range=h_range, r_range=r_range, T_range=T_range,
+                            minima=minimaMain, phases=phasesMain, angleT_vals=thetaTMain, angle0_vals=theta0Main)
+
+    unit.save_boundaries(datestr, resdir, boundariesMain, boundaryDataMain, boundaryValsMain, tag='Main')
     
+    unit.save_isotherms(datestr, resdir, phasesMain, i_isotherm, h_range, r_range, T_range, tag='Main')    
+    
+    datestr = '20201026'
     minima, phases, thetaT, theta0, paramDict, sampleModel = unit.run_composite_phase_boundary_analysis(r_avg,
                             h_range=h_range,
                             thetaL_range=thetaL_range,

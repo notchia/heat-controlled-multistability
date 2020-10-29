@@ -382,6 +382,39 @@ class MetamaterialModel:
     
 #%%
 
+def analyze_main_parameter_composite_phases(thetaL, h_range=1e-3*np.arange(0.5,2.1,0.01),
+                             r_range=np.radians(np.arange(0.0, 1.0, 0.01)),
+                             T_range=np.arange(25.0,75.1,25.0),
+                             b=[], k_sq=0.0, m=0.1471, limFlag='exp', p_lim=[3e-22, 51],
+                             bilayerDict={}):
+    ''' For a given composite with ratio r, compute number of minima across isotherms '''
+    n_h = len(h_range)
+    n_r = len(r_range)
+    n_T = len(T_range)
+    angleT_array = np.zeros((n_h, n_r, n_T))
+    angle0_array = np.zeros((n_h, n_r, n_T))
+    numMin_array = np.zeros((n_h, n_r, n_T))
+    phases_array = np.zeros((n_h, n_r, n_T))    
+
+    t0 = time.perf_counter()
+    for i_h in range(n_h):
+        sys.stdout.write("\rMapping parameter space: analyzing {0}/{1} h values at {2:0.1f} minutes".format(i_h + 1, n_h, (time.perf_counter()-t0)/60.0))
+        sys.stdout.flush()
+        h = h_range[i_h]
+        for i_r in range(n_r):
+            r = r_range[i_r]
+            sample = MetamaterialModel(h, r, thetaL, T=25.0, k_sq=k_sq, m=m, p_lim=p_lim, **bilayerDict)
+            for i_T in range(n_T):
+                sample.update_T(T_range[i_T])              
+                
+                numMin_array[i_h, i_r, i_T] = sample.numMin
+                phases_array[i_h, i_r, i_T] = sample.phases
+                angleT_array[i_h, i_r, i_T] = np.degrees(sample.hinge.thetaT)
+                angle0_array[i_h, i_r, i_T] = np.degrees(sample.total_angle)
+                    
+    return numMin_array, phases_array, angleT_array, angle0_array
+    
+    
 def analyze_composite_phases(r, h_range=1e-3*np.arange(0.5,2.1,0.01),
                              thetaL_range=np.radians(np.arange(-15.0,15.1,0.1)),
                              T_range=np.arange(25.0,75.1,25.0),
@@ -432,9 +465,6 @@ def run_composite_phase_boundary_analysis(r_val,
     phases_file = os.path.join(savedir, '{0}_r{1:.3f}_phases.npy'.format(datestr, r_val))
     thetaT_file = os.path.join(savedir, '{0}_r{1:.3f}_thetaT.npy'.format(datestr, r_val))
     theta0_file = os.path.join(savedir, '{0}_r{1:.3f}_theta0.npy'.format(datestr, r_val))
-    boundaries_file = os.path.join(savedir, '{0}_boundaries.csv'.format(datestr))
-    boundaryVals_file = os.path.join(savedir, '{0}_boundaryVals.csv'.format(datestr))
-    boundaryData_file = os.path.join(savedir, '{0}_boundaryData.csv'.format(datestr))
     
     # Load existing data if previously run
     try:
@@ -466,6 +496,58 @@ def run_composite_phase_boundary_analysis(r_val,
         return minima, phases, thetaT, theta0
     else:
         paramDict = {'r':r_val, 'T':T_range, 'h':h_range, 'theta_L':thetaL_range}
+        return minima, phases, thetaT, theta0, paramDict, sampleModel
+
+
+def run_main_parameter_phase_boundary_analysis(thetaL_val,
+                       h_range=1e-3*np.arange(0.5,2.1,0.01),
+                       r_range=np.radians(np.arange(0.0,1.0,0.01)),
+                       T_range=np.arange(25.0,105.0,25.0),
+                       b=[], k_sq=0.0, m=0.1471, limFlag='exp', p_lim=[3e-22, 51],
+                       bilayerDict={},
+                       savedir='', datestr='', closeFlag=True):
+    ''' FULL PHASE ANALYSIS, but for h-r-T (theta_L = 0) '''
+    
+    if datestr == '':
+        datestr = datetime.today().strftime('%Y%m%d')
+        
+    parameter_file = os.path.join(savedir, '{0}_mainParams_parameters.csv'.format(datestr))
+    metamaterial_file = os.path.join(savedir, '{0}_mainParams_metamaterialObject.npy'.format(datestr))
+    minima_file = os.path.join(savedir, '{0}_mainParams_minima.npy'.format(datestr))
+    phases_file = os.path.join(savedir, '{0}_mainParams_phases.npy'.format(datestr))
+    thetaT_file = os.path.join(savedir, '{0}_mainParams_thetaT.npy'.format(datestr))
+    theta0_file = os.path.join(savedir, '{0}_mainParams_theta0.npy'.format(datestr))
+    
+    # Load existing data if previously run
+    try:
+        print("Try loading previous parameter-space analysis...")
+        #thetaL_val, T_range, h_range, r_range = import_parameters(parameter_file)
+        minima = np.load(minima_file)
+        phases = np.load(phases_file)
+        thetaT = np.load(thetaT_file)
+        theta0 = np.load(theta0_file)
+        sampleModel = np.load(metamaterial_file)
+        print("\tLoaded parameters, minima, phases, theta_T, and theta_0")
+    except IOError:
+        export_parameters(parameter_file, 0.0, T_range, h_range, r_range) #UPDATE THIS FUNCTION
+        sampleModel = MetamaterialModel(1e-3, 0.25, 0.0, T=25.0, k_sq=k_sq, m=m, p_lim=p_lim, **bilayerDict)
+        np.save(metamaterial_file, sampleModel)
+        print("\tRunning new parameter-space analysis...")
+        minima, phases, thetaT, theta0 = analyze_main_parameter_composite_phases(thetaL=0.0, h_range=h_range, r_range=r_range, T_range=T_range,
+                                                                  b=b, k_sq=k_sq, m=m, limFlag=limFlag, p_lim=p_lim, bilayerDict=bilayerDict)
+        for T in T_range:
+            plot_main_parameter_isotherm(thetaL_val, T, phases, theta0, h_range=h_range, r_range=r_range,
+                          T_range=T_range, savedir=savedir, closeFlag=closeFlag)
+        print("\tSaving parameters, minima, phases, theta_T, and theta_0")
+        np.save(minima_file, minima, allow_pickle=False)
+        np.save(phases_file, phases, allow_pickle=False)
+        np.save(thetaT_file, thetaT, allow_pickle=False)
+        np.save(theta0_file, theta0, allow_pickle=False)
+
+    if datestr == '':
+        return minima, phases, thetaT, theta0
+    else:
+        paramDict = {'r':r_range, 'T':T_range, 'h':h_range, 'theta_L':thetaL_val}
         return minima, phases, thetaT, theta0, paramDict, sampleModel
 
 
@@ -674,6 +756,64 @@ def find_3D_phase_boundaries(r, h_range=1e-3*np.arange(0.5,2.1,0.01),
     boundaryData = boundaryData[boundaryData[:,-1].argsort(kind='mergesort')]
 
     return boundaries, boundaryVals, boundaryData
+
+def find_3D_phase_boundaries_main_params(thetaL, h_range=1e-3*np.arange(0.5,2.1,0.01),
+                             r_range=np.arange(0.0,1.0,0.1),
+                             T_range=np.arange(25.0,105.0,25.0),
+                             minima=[], phases=[], angleT_vals=[], angle0_vals=[]):   
+    ''' Find locations of phase boundaries for a given composite '''
+
+    # Find where changes in phase occur *along temperature axis*
+    diffs = np.diff(phases)
+    boundaries = np.argwhere(diffs != 0)
+    N = max(boundaries.shape) # Number of points found located at boundary
+    boundaryVals = np.zeros(N)
+    for pt in range(N):
+        # Get h, r, T, and phase value [0-6] at boundary point
+        loc = [boundaries[pt,0], boundaries[pt,1], boundaries[pt,2]]
+        val = phases[loc[0],loc[1],loc[2]]
+        # Find maximum phase difference between boundary point and all nearest
+        # neighbors *in isotherm* (ignore points at end of range)
+        max_diff = 0
+        check = [-1,0,1]
+        vals = np.zeros(9,dtype=int)
+        if not ((-1 in loc) or loc[0] == phases.shape[0]-1 or loc[1] == phases.shape[1]-1 or loc[2] == phases.shape[2]-1):
+            count = 0
+            for i in check:
+                for j in check:
+                    val_temp = phases[loc[0]+i,loc[1]+j,loc[2]]
+                    val_diff = np.abs(val - val_temp)
+                    if val_diff > max_diff:
+                        max_diff = val_diff
+                    vals[count] = val_temp
+                    count += 1
+        if max_diff == 0:
+            boundaryVals[pt] = np.nan
+        elif (0 in vals) and (1 in vals):
+            boundaryVals[pt] = 0
+        elif (0 in vals) and (1 not in vals):
+            boundaryVals[pt] = 1
+        elif ((2 in vals) or (3 in vals)) and (5 not in vals):
+            boundaryVals[pt] = 3
+        elif ((4 in vals) or (6 in vals)) and (5 not in vals):
+            boundaryVals[pt] = 2
+        elif (max_diff == 2 or max_diff == 3 or max_diff == 5):
+            boundaryVals[pt] = 6
+        elif 1 in vals:
+            boundaryVals[pt] = 3
+        else:
+            boundaryVals[pt] = 5
+
+    # Join and sort boundary information by value
+    boundaryT = np.array([T_range[i] for i in boundaries[:,2]]).reshape((-1,1))
+    boundaryh = np.array([1000*h_range[i] for i in boundaries[:,0]]).reshape((-1,1))
+    boundaryr = np.array([r_range[i] for i in boundaries[:,1]]).reshape((-1,1))
+
+    boundaryVals = boundaryVals.reshape((-1,1))
+    boundaryData = np.concatenate((boundaryT, boundaryh, boundaryr, boundaryVals), axis=1)
+    boundaryData = boundaryData[boundaryData[:,-1].argsort(kind='mergesort')]
+
+    return boundaries, boundaryVals, boundaryData
     
 
 def plot_isotherm(r, T, phases, angle0_vals,
@@ -698,8 +838,8 @@ def plot_isotherm(r, T, phases, angle0_vals,
     
     # Formatting
     plt.title(r'$T$ = {0}$^\circ$C, $r$ = {1:0.2f}'.format(int(T), r), size=18)
-    plt.xlabel(r'hinge thickness $h$ (mm)')
-    plt.ylabel(r'fabrication angle $\theta_L$ (degrees)')
+    plt.xlabel(r'$h$ (mm)')
+    plt.ylabel(r'$\theta_L$ (degrees)')
     
     if savedir != '':
         figname = 'isotherm_{0}C_r{1:0.2f}.png'.format(int(T), r)
@@ -709,13 +849,49 @@ def plot_isotherm(r, T, phases, angle0_vals,
 
     return
 
+def plot_main_parameter_isotherm(thetaL, T, phases, angle0_vals,
+                         h_range=1e-3*np.arange(0.5,2.1,0.01),
+                         r_range=np.radians(np.arange(0.0, 1.0, 0.01)),
+                         T_range=np.arange(25.0,105.0,25.0), savedir='', closeFlag=True):
+    ''' Plot isotherm phase diagram for a given value of theta_L: h vs r
+        at a particular temperature T'''
+    
+    # Find where in simulation data the desired T value occurs
+    i_T = np.argwhere(T_range == T)[0][0]
+    
+    colors = ['xkcd:light red', 'xkcd:apple green', 'xkcd:apple green', 'xkcd:apple green', 'xkcd:electric blue', 'xkcd:electric blue', 'xkcd:electric blue']
+    fig = plt.figure(dpi=200)
+    ax = fig.gca()
+    X = 1000*h_range
+    Y = r_range
+    Z = np.transpose(phases[:,:,i_T])
+    diagram = ax.imshow(Z, extent=[X.min(), X.max(), Y.min(), Y.max()],
+                        origin='lower', aspect='auto', cmap=col.ListedColormap(colors))           
+    
+    # Formatting
+    plt.title(r'$T$ = {0}$^\circ$C, $\theta_L$ = {1:0.1f}'.format(int(T), thetaL), size=18)
+    plt.xlabel(r'$h$ (mm)')
+    plt.ylabel(r'$r$')
+    
+    if savedir != '':
+        figname = 'isotherm_mainParams_{0}C.png'.format(int(T))
+        plt.savefig(os.path.join(savedir, figname),dpi=200)
+    if closeFlag:
+        plt.close()
 
-def save_isotherms(datestr, resdir, minima, i_isotherm, h_range, thetaL_range, T_range):
+    return
+
+
+
+def save_isotherms(datestr, resdir, minima, i_isotherm, h_range, thetaL_range, T_range, tag=''):
     ''' Given i_isotherm corresponding to index in T_range for which to plot isotherms,
         save individual isothersm to csv and vtk '''
 
     x = np.array([1000*h for h in h_range])#.reshape((-1,1))
-    y = np.array([np.degrees(theta) for theta in thetaL_range])#.reshape((-1,1))
+    if tag=='':
+        y = np.array([np.degrees(theta) for theta in thetaL_range])#.reshape((-1,1))
+    else:
+        y = thetaL_range
     #xmesh, ymesh = np.meshgrid(x, y)
     #xvec = xmesh.reshape((-1,1))
     #yvec = ymesh.reshape((-1,1)) 
@@ -723,18 +899,18 @@ def save_isotherms(datestr, resdir, minima, i_isotherm, h_range, thetaL_range, T
     for count, index in enumerate(i_isotherm):
         isotherm_vals = minima[:,:,index]#.reshape((-1,1))
         #isothermData = np.concatenate((xvec, yvec, isotherm_vals), axis=1)
-        isotherm_file_base = os.path.join(resdir, '{0}_isotherm_{1}'.format(datestr, count))
+        isotherm_file_base = os.path.join(resdir, '{0}_isotherm{1}_{2}'.format(datestr, tag, count))
         data2vtk_rectilinear(x, y, T_range[index], isotherm_vals, isotherm_file_base)
     
     return
 
 
-def save_boundaries(datestr, cwd, boundaries, boundaryData, boundaryVals):
+def save_boundaries(datestr, cwd, boundaries, boundaryData, boundaryVals, tag=''):
     ''' Given boundary values, save to csv and vtk '''
     
-    boundaries_file = os.path.join(cwd, '{0}_boundaries.csv'.format(datestr))
-    boundaryVals_file = os.path.join(cwd, '{0}_boundaryVals.csv'.format(datestr))
-    boundaryData_file = os.path.join(cwd, '{0}_boundaryData.csv'.format(datestr))
+    boundaries_file = os.path.join(cwd, '{0}_boundaries{1}.csv'.format(datestr, tag))
+    boundaryVals_file = os.path.join(cwd, '{0}_boundaryVals{1}.csv'.format(datestr, tag))
+    boundaryData_file = os.path.join(cwd, '{0}_boundaryData{1}.csv'.format(datestr, tag))
     
     export_to_csv(boundaries_file, boundaries, fmt='%d',
                   variables=["T index", "h index", "thetaL index"],
@@ -750,8 +926,8 @@ def save_boundaries(datestr, cwd, boundaries, boundaryData, boundaryVals):
     for surface in boundarySurfaces:
         value = surface[0,-1]
         if not np.isnan(value):
-            fname = os.path.join(cwd, '{0}_boundaryData_{1}.csv'.format(datestr,int(value)))
-            export_to_csv(fname, surface[:,0:-1], fmt=['%0.1f','%0.4f','%0.2f'],
+            fname = os.path.join(cwd, '{0}_boundaryData{1}_{2}.csv'.format(datestr,tag,int(value)))
+            export_to_csv(fname, surface[:,0:-1], fmt=['%0.1f','%0.4f','%0.3f'],
                           variables=["T", "h", "thetaL"],
                           units=["degrees C","mm","degrees"])
             csv2vtk_unstructured(fname)
