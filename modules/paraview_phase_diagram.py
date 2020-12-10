@@ -51,11 +51,23 @@ def render_surface(fname,yscale=2):
                                     2, 0.5, 0.5, 0.5,
                                     3, 0.7, 0.7, 0.7,
                                     6, 0.9, 0.9, 0.9]  
-    '''
     scalarsLookupTable.RGBPoints = [0, 0.2, 0.2, 0.2,
                                     1, 0.5, 0.5, 0.5,
-                                    3, 0.9, 0.9, 0.9]  
-    
+                                    3, 0.9, 0.9, 0.9]
+    '''
+    scalarsLookupTable.RGBPoints = [0, 1.0, 1.0, 1.0,
+                                    1, 1.0, 1.0, 1.0,
+                                    3, 1.0, 1.0, 1.0,
+                                    6, 1.0, 1.0, 1.0] 
+    '''
+    scalarsLookupTable.RGBPoints = [0, 1.0, 71.0/255.0, 76.0/255.0, #light red
+                                     1, 118.0/255.0, 205.0/255.0, 38.0/255.0, #apple green
+                                     2, 6.0/255.0, 82.0/255.0, 1.0,
+                                     3, 6.0/255.0, 82.0/255.0, 1.0,
+                                     4, 6.0/255.0, 82.0/255.0, 1.0, #electric blue
+                                     5, 6.0/255.0, 82.0/255.0, 1.0,
+                                     6, 6.0/255.0, 82.0/255.0, 1.0]
+    '''
     ''' Create a new Delaunay 2D triangular mesh '''
     triangleMesh = pv.Delaunay2D(Input=boundaryVTK)
     
@@ -90,8 +102,10 @@ def render_surface(fname,yscale=2):
     '''
     scalarsLookupTable.EnableOpacityMapping = 1
     opacityLookupTable = pv.GetOpacityTransferFunction('point_scalars')
-    opacityLookupTable.Points = [0.0, 0.75, 0.5, 0.0,
-                                 6.0, 0.75, 0.5, 0.0]
+    opacityLookupTable.Points = [0.0, 1.00, 0.5, 0.0,
+                                 1.0, 1.00, 0.5, 0.0,
+                                 3.0, 0.00, 0.5, 0.0,
+                                 6.0, 0.00, 0.5, 0.0]
     '''
     
     # change scalar bar placement
@@ -175,13 +189,23 @@ def render_isotherm(fname,yscale=2):
     scalarsLookupTable2 = pv.GetColorTransferFunction('scalars')
     # Explicitly specify color map control points as flattened list of tuples:
     # (data_value, red, green, blue) with color components in range [0.0, 1.0]
+    '''
     scalarsLookupTable2.RGBPoints = [0, 1.0, 71.0/255.0, 76.0/255.0, #light red
                                      1, 118.0/255.0, 205.0/255.0, 38.0/255.0, #apple green
                                      2, 118.0/255.0, 205.0/255.0, 38.0/255.0,
                                      3, 118.0/255.0, 205.0/255.0, 38.0/255.0,
                                      4, 6.0/255.0, 82.0/255.0, 1.0, #electric blue
                                      5, 6.0/255.0, 82.0/255.0, 1.0,
-                                     6, 6.0/255.0, 82.0/255.0, 1.0]        
+                                     6, 6.0/255.0, 82.0/255.0, 1.0]  '''      
+    # Scalar lookup table
+    scalarsLookupTable2.RGBPoints = [0, 1.0, 71.0/255.0, 76.0/255.0, #light red
+                                     1, 118.0/255.0, 205.0/255.0, 38.0/255.0, #apple green
+                                     2, 118.0/255.0, 205.0/255.0, 38.0/255.0,
+                                     3, 6.0/255.0, 82.0/255.0, 1.0,
+                                     4, 6.0/255.0, 82.0/255.0, 1.0, #electric blue
+                                     5, 6.0/255.0, 82.0/255.0, 1.0,
+                                     6, 6.0/255.0, 82.0/255.0, 1.0]     
+
     
     ''' Create a new Delaunay 2D triangular mesh '''
     planeMesh = pv.RectilinearGridGeometryFilter(isothermVTK)
@@ -265,7 +289,7 @@ def render_isotherms(fnameList2, yscale=2):
 if __name__ == "__main__":
     basepath = 'C:/Users/lucia/Documents/Research/heat-controlled_multistability/results/'
 
-    '''    
+    
     datestr = '20201027'#'20201019' #'20200422' #
 
     #values = [0,1,2,3,5,6]
@@ -308,6 +332,6 @@ if __name__ == "__main__":
     pv.Interact()
     pv.SaveScreenshot(os.path.join(basepath,'paraview.png'),pv.GetActiveView(),
                       TransparentBackground=1)
-    
+    '''
     
     
