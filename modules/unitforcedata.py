@@ -309,6 +309,35 @@ def plot_magnet_and_T_comparison(ucdf, stdFlag=False, legendOut=False):
     
     return
 
+
+def plot_no_magnet_model_T_comparison(ucdf, modellist, stdFlag=False, legendOut=False):
+    ''' Plot and compare data, grouping by magnets and temperature for final fig. 4'''
+    
+    plt.figure(dpi=200)
+    plt.xlabel("Strain, $\delta/d$")
+    plt.ylabel("Load (N)")
+    colors = ['r','g','b']
+    styles = ['-','--']
+    TLabels = ['RT', 'T~45$^\circ$', 'T~75$^\circ$']
+    magnetLabels = ['no', 'with']
+    for index, row in ucdf.iterrows():
+        unit = row["data"]
+        T_index = int(unit.T_group)
+        m_index = int(unit.magnets)
+        disp_plt = unit.strain#
+        plt.plot(disp_plt, unit.load, color=colors[T_index], linestyle=styles[m_index],
+                 label='{0}, {1} magnets'.format(TLabels[T_index], magnetLabels[m_index]))
+        if stdFlag:
+            plt.fill_between(disp_plt, unit.load-unit.std, unit.load+unit.std, color=colors[T_index], alpha=0.2)
+        plt.plot(disp_plt[:-550], modellist[index][:-550], '--', color=colors[T_index], label="model")
+    if legendOut:
+        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    else:
+        plt.legend()
+    
+    return
+
+
     
 #%% Main importing function
 if __name__ == "__main__":   

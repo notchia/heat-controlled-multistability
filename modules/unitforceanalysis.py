@@ -33,12 +33,21 @@ def analyze_repeatability_data(sourcedir, bilayerDict, k_sq=4e-3, setStartLoadTo
 
     # Get UCDF for averaged data
     ucdf_avg_N = pd.DataFrame()
+    ucdf_model = []
     for T_group in range(3):
         subframe = ucdf.loc[(ucdf["T_group"] == T_group) & (ucdf["magnets"] == 0)]
         unitCell_avg = experiment.compute_unitCell_mean_std(subframe)
-        ucdf_avg_N = ucdf_avg_N.append(unitCell_avg.get_Series(),ignore_index=True)
+        row = unitCell_avg.get_Series()
+        ucdf_avg_N = ucdf_avg_N.append(row,ignore_index=True)
+        unitData = row["data"]
+        unitModel = metamat.MetamaterialModel(unitData.h, unitData.r, ANGLE_NEAR_ZERO,
+                                              T=unitData.T, d=unitData.d, 
+                                              k_sq=ksq, loadFlag=True, hasMagnets=bool(unitData.magnets),
+                                              **bilayerDict)
+        ucdf_model.append(unitModel.model_load_disp(unitData.disp))
     
-    experiment.plot_magnet_and_T_comparison(ucdf_avg_N, stdFlag=True)
+    #experiment.plot_magnet_and_T_comparison(ucdf_avg_N, stdFlag=True)
+    experiment.plot_no_magnet_model_T_comparison(ucdf_avg_N, ucdf_model, stdFlag=True)
     if saveFlag:
         title = 'unitCell_repeatability_force_N'
         plt.savefig(os.path.join(figdir,"{0}.png".format(title)), dpi=200)
