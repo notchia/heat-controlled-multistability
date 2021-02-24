@@ -15,7 +15,7 @@ pv._DisableFirstRenderCameraReset()
 def render_surface(fname,yscale=2):
     ''' Render a single surface, defined in the file fname '''
     
-    fontSize = 16
+    fontSize = 24#16
     textColor = [0,0,0] #black
     
     axisLabels = ['h (mm)', 'r', 'T (C)']#['$h$ (mm)', '$\theta_L$ ($^{\circ}$)', '$T$ ($^{\circ}$C)']
@@ -127,12 +127,15 @@ def render_surface(fname,yscale=2):
     renderView.AxesGrid.XTitle = axisLabels[0]
     renderView.AxesGrid.YTitle = axisLabels[1]
     renderView.AxesGrid.ZTitle = axisLabels[2]
-    renderView.AxesGrid.XTitleFontSize = 2*fontSize
-    renderView.AxesGrid.YTitleFontSize = 2*fontSize
-    renderView.AxesGrid.ZTitleFontSize = 2*fontSize
+    renderView.AxesGrid.XTitleFontSize = fontSize
+    renderView.AxesGrid.YTitleFontSize = fontSize
+    renderView.AxesGrid.ZTitleFontSize = fontSize
     renderView.AxesGrid.XTitleColor = textColor
     renderView.AxesGrid.YTitleColor = textColor
     renderView.AxesGrid.ZTitleColor = textColor
+    renderView.AxesGrid.XTitleOpacity = 0
+    renderView.AxesGrid.YTitleOpacity = 0
+    renderView.AxesGrid.ZTitleOpacity = 0
     
     renderView.AxesGrid.XLabelFontSize = fontSize
     renderView.AxesGrid.YLabelFontSize = fontSize
@@ -159,7 +162,7 @@ def render_surface(fname,yscale=2):
 def render_isotherm(fname,yscale=2):
     ''' Render a single surface, defined in the file fname '''
     
-    #fontSize = 16
+    fontSize = 24 #16
     #textColor = [0,0,0] #black
     
     #axisLabels = ['h (mm)', 'theta_L (deg)', 'T (C)']#['$h$ (mm)', '$\theta_L$ ($^{\circ}$)', '$T$ ($^{\circ}$C)']
@@ -289,10 +292,9 @@ def render_isotherms(fnameList2, yscale=2):
 if __name__ == "__main__":
     basepath = 'C:/Users/lucia/Documents/Research/heat-controlled_multistability/results/'
 
-    
-    datestr = '20201027'#'20201019' #'20200422' #
+    '''
+    datestr = '20201027'#20201214
 
-    #values = [0,1,2,3,5,6]
     boundaryValues = [0,1,2,3,6]
     fnameList = []
     for value in boundaryValues:
@@ -332,6 +334,6 @@ if __name__ == "__main__":
     pv.Interact()
     pv.SaveScreenshot(os.path.join(basepath,'paraview.png'),pv.GetActiveView(),
                       TransparentBackground=1)
-    '''
+    
     
     

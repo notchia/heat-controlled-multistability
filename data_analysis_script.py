@@ -177,7 +177,7 @@ if __name__ == "__main__":
     r_val = 0.25
     T_range = [25.0, 35.0, 50.0, 80.0]
     unit.plot_energy_concept(h_val, r_val, 0.0, T_range,
-                             k_sq=ksq_fit, m=moment_fit, p_lim=p_lim_fit,
+                             k_sq=ksq_fit, m=moment_fit, #p_lim=p_lim_fit,
                              bilayerDict=bilayerDict,
                              figdir=savedir)
 
@@ -192,6 +192,17 @@ if __name__ == "__main__":
                                 saveFlag=SAVE_FLAG, figdir=savedir)'''
 
 
+    #%% Plot energy landscapes for specific cases
+    ANGLE_NEAR_ZERO = 1e-8 # Since setting angle to exactly zero can give numerical trouble
+    unit.MetamaterialModel(0.73e-3, 0.47, ANGLE_NEAR_ZERO, T=25.0,
+                              k_sq=ksq_fit,
+                              loadFlag=True, plotFlag=True,
+                              **bilayerDict)
+    unit.MetamaterialModel(1.50e-3, 0.40, ANGLE_NEAR_ZERO, T=25.0,
+                              k_sq=ksq_fit,
+                              loadFlag=True, plotFlag=True,
+                              **bilayerDict)
+
     #%% Generate and plot 3D phase diagram 
     section_header('phase diagrams')    
     #h_range = 1e-3*np.arange(0.7,2.1,0.01) # 20201019
@@ -199,16 +210,17 @@ if __name__ == "__main__":
     #T_range = np.arange(25.0,100.5,0.5) # 20201019
     h_range = 1e-3*np.arange(0.5,2.005,0.005)
     thetaL_range = np.radians(np.arange(-15.0,15.05,0.05))
-    T_range = np.arange(25.0,78.5,0.5) 
-    T_isotherm = [25.0, 45.0, 78.0]
+    T_range = np.arange(25.0,78.5,0.5) # CURRENTLY IN MANUSCRIPT
+    #T_range = np.arange(25.0,100.5,0.5)
+    T_isotherm = [25.0, 45.0, 78.0] # CURRENTLY IN MANUSCRIPT
     i_isotherm = [np.argwhere(T_range == T_val)[0][0] for T_val in T_isotherm]
     
     r_range = np.arange(0.0,1.0,0.005)
-    T_isotherm = [25.0, 55.0, 75.0]
+    T_isotherm = [25.0, 55.0, 75.0] # CURRENTLY IN MANUSCRIPT??
      
-    #datestr = '20201019'  
-
-    datestr = '20201028'
+    #datestr = '20201028'  # CURRENTLY IN MANUSCRIPT
+    datestr = 20201028
+    #datestr = 20201214
     minimaMain, phasesMain, thetaTMain, theta0Main, paramDictMain, sampleModelMain = unit.run_main_parameter_phase_boundary_analysis(0.0,
                             h_range=h_range,
                             r_range=r_range,
@@ -225,7 +237,7 @@ if __name__ == "__main__":
     
     unit.save_isotherms(datestr, resdir, phasesMain, i_isotherm, h_range, r_range, T_range, tag='Main')    
     
-    datestr = '20201026'
+    datestr = '20201026' # CURRENTLY IN MANUSCRIPT
     minima, phases, thetaT, theta0, paramDict, sampleModel = unit.run_composite_phase_boundary_analysis(r_avg,
                             h_range=h_range,
                             thetaL_range=thetaL_range,
@@ -234,7 +246,7 @@ if __name__ == "__main__":
                             bilayerDict=bilayerDict,
                             savedir=resdir, closeFlag=False, datestr=datestr)
     
-    datestr = '20201027'
+    datestr = '20201027' # CURRENTLY IN MANUSCRIPT
     boundaries, boundaryVals, boundaryData = unit.find_3D_phase_boundaries(r_avg,
                             h_range=h_range, thetaL_range=thetaL_range, T_range=T_range,
                             minima=minima, phases=phases, angleT_vals=thetaT, angle0_vals=theta0)
@@ -243,7 +255,12 @@ if __name__ == "__main__":
     
     unit.save_isotherms(datestr, resdir, phases, i_isotherm, h_range, thetaL_range, T_range)
     
-    
+    #%%
+    '''
+    for T in T_range:
+        unit.plot_isotherm(r_avg, T, phases, theta0, h_range=h_range, thetaL_range=thetaL_range,
+                      T_range=T_range, savedir=resdir, closeFlag=True)   
+    '''
     
     
     

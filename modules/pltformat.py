@@ -11,12 +11,12 @@ import matplotlib.pyplot as plt
 
 plt.rcParams['font.family']     = 'arial'
 #plt.rcParams['figure.figsize']  = 9, 6      # (w=3,h=2) multiply by 3
-plt.rcParams['font.size']       = 12        # Original font size is 8, multipy by above number
+plt.rcParams['font.size']       = 16 # Original is 12!!        # Original font size is 8, multipy by above number
 plt.rcParams['lines.linewidth'] = 2
 plt.rcParams['lines.markersize'] = 8
 plt.rcParams['legend.fontsize'] = 10    
-plt.rcParams['xtick.labelsize'] = 12    
-plt.rcParams['ytick.labelsize'] = 12        
+plt.rcParams['xtick.labelsize'] = 16 # Original is 12!  
+plt.rcParams['ytick.labelsize'] = 16 # Original is 12!
 plt.rcParams['xtick.direction'] = 'in'
 plt.rcParams['ytick.direction'] = 'in' 
 plt.rcParams['savefig.dpi']  = 200

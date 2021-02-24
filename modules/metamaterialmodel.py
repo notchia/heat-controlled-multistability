@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-'''
+"""
 Created on Fri Jun 19 11:27:45 2020
 
 @author: Lucia
-'''
+"""
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -20,9 +20,9 @@ from modules import bilayermodel as bilayer
 
 
 class MetamaterialModel:
-    ''' Model for a PDMS-LCE bilayer hinge of total thickness h_total and
+    """ Model for a PDMS-LCE bilayer hinge of total thickness h_total and
         LCE:total thickness ratio r. Initialized at room temperature, but can
-        be updated for any temperature. Specify only one of s or b.'''
+        be updated for any temperature. Specify only one of s or b."""
     def __init__(self, h_total, ratio, thetaL, T=25.0,
                  LCE_strain_params=[0.039457,142.37,6.442e-3],
                  LCE_modulus_params=[-8.43924097e-02,2.16846882e+02,3.13370660e+05],
@@ -68,7 +68,7 @@ class MetamaterialModel:
     
     # Functions callable from outside -----------------------------------------
     def update_T(self, T):
-        ''' Update all values which vary with temperature, in the appropriate order'''
+        """ Update all values which vary with temperature, in the appropriate order"""
         self.T = T
         self.hinge.update_temperature(T)
         self.total_angle = self.hinge.thetaT + self.thetaL
@@ -78,7 +78,7 @@ class MetamaterialModel:
         return
 
     def model_load_disp(self, disp):
-        ''' Given displacement x, return load corresponding to unit cell test '''
+        """ Given displacement x, return load corresponding to unit cell test """
         q = self._disp2rot(disp)
         M_k = self._torque_k(q)
         if self.hasMagnets:
@@ -96,11 +96,11 @@ class MetamaterialModel:
 
     # Forces and torques, for comparison to experimental data -----------------
     def _rot2disp(self, q):
-        ''' Displacement between centers of squares '''
+        """ Displacement between centers of squares """
         return self.d*np.cos(q)
     
     def _disp2rot(self, x):
-        ''' Displacement between centers of squares '''
+        """ Displacement between centers of squares """
         return np.arccos(x/self.d)
     
     def _equivalent_torsional_spring(self):
@@ -111,16 +111,16 @@ class MetamaterialModel:
         return k_eq
     
     def _torque_k(self, q):
-        ''' Linear torsional spring representing hinge '''
+        """ Linear torsional spring representing hinge """
         return -self.k_eq*(2*(q - self.total_angle))
     
     def _torque_magnet(self, q):
-        ''' Point dipole at centers of each square '''
+        """ Point dipole at centers of each square """
         mu = 1.2566*10**(-6) # [N/A^2]
         return 3*mu*(self.m**2)*(self.d/2)*np.sin(q)/(2*np.pi*self._rot2disp(q)**4)
     
     def _torque_lim(self, q):
-        ''' Torque resulting from square collision, limiting max displacement '''
+        """ Torque resulting from square collision, limiting max displacement """
         if self.limFlag=='pcw':
             f_lim = self._torque_lim_pcw_single
         elif self.limFlag=='exp':
@@ -135,7 +135,7 @@ class MetamaterialModel:
         return F
     
     def _torque_lim_pcw_single(self, q_value):
-        ''' Piecewise linear torsional spring model for square collision '''
+        """ Piecewise linear torsional spring model for square collision """
         q_lim, k_lim = self.p_lim
         if q_value > q_lim:
             M = -k_lim*(2*(q_value-q_lim))
@@ -146,14 +146,14 @@ class MetamaterialModel:
         return M    
     
     def _torque_lim_exp_single(self, q_value):
-        ''' Exponential model for square collision '''
+        """ Exponential model for square collision """
         A, B = self.p_lim
         M = -B*A*(np.exp(B*(q_value)) - np.exp(-B*(q_value)))
         return M
     
     # Enerties, for simulation and phase analysis -----------------------------
     def _analyze_energy(self):
-        ''' Calculate potential energy and find the minima and phases '''
+        """ Calculate potential energy and find the minima and phases """
         q_range = np.radians(np.arange(-50.0,50.5,0.5))
         energy = self._calculate_total_energy(q_range)
         self.numMin, self.locMin, self.phases, self.diffs, self.barriers = self._analyze_energy_local_extrema(energy, q_range)
@@ -161,10 +161,10 @@ class MetamaterialModel:
         return 
     
     def _model_U_limit(self, q):
-        ''' Calculate energy of collision of adjacent squares, given current angle between squares '''
+        """ Calculate energy of collision of adjacent squares, given current angle between squares """
         if self.limFlag == 'exp': #Exponential
             A, B = self.p_lim #[1e-21, 50]
-            U_limit = A*(np.exp(B*2*q/2) + np.exp(-B*2*q/2))
+            U_limit = A*(np.exp(B*2*q/2) + np.exp(-B*2*q/2)) # 01/20/21: Fuck... just realized I somehow lost the -2 in here. Maybe that's why I was having numerical issues...
         elif self.limFlag == 'pcw': #Piecewise
             k_limit, q_limit = self.p_lim #[0.2, np.radians(41)]
             if q > q_limit:
@@ -176,21 +176,21 @@ class MetamaterialModel:
         return U_limit
 
     def _model_U_magnet(self, q):
-        ''' Calculate energy of magnet interaction, given current angle between squares'''
+        """ Calculate energy of magnet interaction, given current angle between squares"""
         mu = 1.256637e-6 # magnetic permeability of free space
         dist = self.d*np.cos(q) # distance between square centers
         U_m = -(mu*self.m**2)/(2*np.pi*dist**3)
         return U_m
 
     def _model_U_spring(self, q):
-        ''' Calculate energy of hinge linear torsional spring deformation, given current angle between squares '''
+        """ Calculate energy of hinge linear torsional spring deformation, given current angle between squares """
         U_k = 0.5*self.k_eq*(2*(q - self.total_angle))**2
         return U_k
  
     def _calculate_total_energy(self, q_vals):
-        ''' Potential energy of magnet, torsion spring, and square deformation
+        """ Potential energy of magnet, torsion spring, and square deformation
             at a given angle. Returns both total energy and list of component
-            energies. thetas: array'''  
+            energies. thetas: array"""  
         assert isinstance(q_vals, np.ndarray), 'function takes array of q values'
         nVals = len(q_vals)
         
@@ -219,8 +219,8 @@ class MetamaterialModel:
         return U_total
     
     def _plot_energy(self, q, U_total, U_m=[], U_k=[], U_lim=[]):
-        ''' Plot total energy curve, individual contributions if specified, and
-            local extrema ''' 
+        """ Plot total energy curve, individual contributions if specified, and
+            local extrema """ 
         
         q = np.degrees(q)
         
@@ -229,12 +229,13 @@ class MetamaterialModel:
         plt.xlabel(r"Angle $\theta$ (degrees)")
         plt.ylabel("Energy (J)")        
 
+        """
         if U_m.any():
             plt.plot(q, U_m, 'b--', label="Magnet")
         if U_k.any():
             plt.plot(q, U_k, 'r--', label="Spring")
         if U_lim.any():
-            plt.plot(q, U_lim, 'g--', label="Collision")
+            plt.plot(q, U_lim, 'g--', label="Collision")"""
         plt.plot(q, U_total, 'k', label="Total")
         
         minima = signal.argrelmin(U_total)[0]
@@ -250,18 +251,19 @@ class MetamaterialModel:
             plt.ylim(minU[0]-0.0001, maxU[-1]+0.0001)
         plt.ylim(-0.0015,0.001)
         
-        if (U_m.any() or U_k.any() or U_lim.any()):
-            plt.legend()
+        """if (U_m.any() or U_k.any() or U_lim.any()):
+            plt.legend()"""
         plt.tight_layout()
-        #plt.savefig('h{0:.2f}_r{1:.2f}_L{2:0.1f}_T{3:.1f}.png'.format(self.h_total, self.ratio, np.degrees(self.thetaL), int(self.T)))
-        #plt.close()
+        
+        plt.savefig('h{0:.2f}_r{1:.2f}_L{2:0.1f}_T{3:.1f}.png'.format(self.h_total, self.ratio, np.degrees(self.thetaL), int(self.T)))
+        plt.close()
         
         return
     
     def _analyze_energy_local_extrema(self, energy, q_range, verboseFlag=False):
-        ''' Count local extrema of energy curve, find normalized energy
+        """ Count local extrema of energy curve, find normalized energy
             barriers and differences between them, and determine what phases
-            are present '''  
+            are present """  
         
         q_crit = np.arccos(1-0.24) # Consider only local maxima occuring before this point
         plimL = np.where(q_range > -q_crit)[0][0]
@@ -387,7 +389,7 @@ def analyze_main_parameter_composite_phases(thetaL, h_range=1e-3*np.arange(0.5,2
                              T_range=np.arange(25.0,75.1,25.0),
                              b=[], k_sq=0.0, m=0.1471, limFlag='exp', p_lim=[3e-22, 51],
                              bilayerDict={}):
-    ''' For a given composite with ratio r, compute number of minima across isotherms '''
+    """ For a given composite with ratio r, compute number of minima across isotherms """
     n_h = len(h_range)
     n_r = len(r_range)
     n_T = len(T_range)
@@ -420,7 +422,7 @@ def analyze_composite_phases(r, h_range=1e-3*np.arange(0.5,2.1,0.01),
                              T_range=np.arange(25.0,75.1,25.0),
                              b=[], k_sq=0.0, m=0.1471, limFlag='exp', p_lim=[3e-22, 51],
                              bilayerDict={}):
-    ''' For a given composite with ratio r, compute number of minima across isotherms '''
+    """ For a given composite with ratio r, compute number of minima across isotherms """
     n_h = len(h_range)
     n_L = len(thetaL_range)
     n_T = len(T_range)
@@ -454,7 +456,7 @@ def run_composite_phase_boundary_analysis(r_val,
                        b=[], k_sq=0.0, m=0.1471, limFlag='exp', p_lim=[3e-22, 51],
                        bilayerDict={},
                        savedir='', datestr='', closeFlag=True):
-    ''' FULL PHASE ANALYSIS '''
+    """ FULL PHASE ANALYSIS """
     
     if datestr == '':
         datestr = datetime.today().strftime('%Y%m%d')
@@ -474,7 +476,7 @@ def run_composite_phase_boundary_analysis(r_val,
         phases = np.load(phases_file)
         thetaT = np.load(thetaT_file)
         theta0 = np.load(theta0_file)
-        sampleModel = np.load(metamaterial_file)
+        sampleModel = np.load(metamaterial_file, allow_pickle=True)
         print("\tLoaded parameters, minima, phases, theta_T, and theta_0")
     except IOError:
         export_parameters(parameter_file, r_val, T_range, h_range, thetaL_range) #UPDATE THIS FUNCTION
@@ -506,7 +508,7 @@ def run_main_parameter_phase_boundary_analysis(thetaL_val,
                        b=[], k_sq=0.0, m=0.1471, limFlag='exp', p_lim=[3e-22, 51],
                        bilayerDict={},
                        savedir='', datestr='', closeFlag=True):
-    ''' FULL PHASE ANALYSIS, but for h-r-T (theta_L = 0) '''
+    """ FULL PHASE ANALYSIS, but for h-r-T (theta_L = 0) """
     
     if datestr == '':
         datestr = datetime.today().strftime('%Y%m%d')
@@ -526,7 +528,7 @@ def run_main_parameter_phase_boundary_analysis(thetaL_val,
         phases = np.load(phases_file)
         thetaT = np.load(thetaT_file)
         theta0 = np.load(theta0_file)
-        sampleModel = np.load(metamaterial_file)
+        sampleModel = np.load(metamaterial_file, allow_pickle=True)
         print("\tLoaded parameters, minima, phases, theta_T, and theta_0")
     except IOError:
         export_parameters(parameter_file, 0.0, T_range, h_range, r_range) #UPDATE THIS FUNCTION
@@ -557,7 +559,7 @@ def analyze_h_T_relation(r, h_range=1e-3*np.arange(0.5,2.1,0.001),
                              k_sq=0.0, m=0.1471, limFlag='exp', p_lim=[3e-22, 51],
                              bilayerDict={},
                              saveFlag=False, figdir=''):
-    ''' For a given composite with ratio r, compute number of minima across isotherms '''
+    """ For a given composite with ratio r, compute number of minima across isotherms """
     n_h = len(h_range)
     n_T = len(T_range)
     angleT_array = np.zeros((n_h, n_T))
@@ -604,7 +606,7 @@ def analyze_diagonal_dependence(h_val, ratio_val, thetaL_val,
                                 k_sq=0.0, m=0.1471, limFlag='exp', p_lim=[3e-22, 51],
                                 bilayerDict={},
                                 saveFlag=False, figdir=''):
-    ''' Map stability along three parameter axes: thickness, LCE:PDMS ratio, initial angle '''
+    """ Map stability along three parameter axes: thickness, LCE:PDMS ratio, initial angle """
    
     n_a = max(a_range.shape)
     n_T = max(T_range.shape)
@@ -656,8 +658,9 @@ def analyze_diagonal_dependence(h_val, ratio_val, thetaL_val,
     return
 
 
-''' Export parameters used to map parameter space '''
 def export_parameters(filename, r, T, h, thetaL):
+    """ Export parameters used to map parameter space """
+
     with open(filename, 'w') as f:
         f.write("{0:.3f}\n".format(r))
         f.write(", ".join(map(str, T)) + "\n")
@@ -665,8 +668,9 @@ def export_parameters(filename, r, T, h, thetaL):
         f.write(", ".join(map(str, thetaL)) + "\n")
 
 
-''' Import parameters used for previously-calculated parameter-space analysis '''
 def import_parameters(filename):
+    """ Import parameters used for previously-calculated parameter-space analysis """
+
     with open(filename, 'r') as f:
         p = f.readlines()
         r = p[0].strip('\n')
@@ -687,7 +691,10 @@ def import_parameters(filename):
 
     return r, T, h, thetaL
 
+
 def export_to_csv(filename, data, variables=[], units=[], fmt='%0.18e'):
+    """ Export columns with variable names/units if provided as 1 or 2 rows """
+    
     if variables != [] and units != []:
         headerVars = ", ".join(map(str, variables))
         headerUnits = ", ".join(map(str, units))
@@ -697,13 +704,15 @@ def export_to_csv(filename, data, variables=[], units=[], fmt='%0.18e'):
     headerStr = headerVars + '\n' + headerUnits
     
     np.savetxt(filename, data, delimiter=', ', fmt=fmt, header=headerStr)
+    
     return filename
+
 
 def find_3D_phase_boundaries(r, h_range=1e-3*np.arange(0.5,2.1,0.01),
                              thetaL_range=np.radians(np.arange(-15.0,15.1,0.1)),
                              T_range=np.arange(25.0,105.0,25.0),
                              minima=[], phases=[], angleT_vals=[], angle0_vals=[]):   
-    ''' Find locations of phase boundaries for a given composite '''
+    """ Find locations of phase boundaries for a given composite """
 
     # Find where changes in phase occur *along temperature axis*
     diffs = np.diff(phases)
@@ -757,11 +766,17 @@ def find_3D_phase_boundaries(r, h_range=1e-3*np.arange(0.5,2.1,0.01),
 
     return boundaries, boundaryVals, boundaryData
 
+
 def find_3D_phase_boundaries_main_params(thetaL, h_range=1e-3*np.arange(0.5,2.1,0.01),
                              r_range=np.arange(0.0,1.0,0.1),
                              T_range=np.arange(25.0,105.0,25.0),
                              minima=[], phases=[], angleT_vals=[], angle0_vals=[]):   
-    ''' Find locations of phase boundaries for a given composite '''
+    """ Find locations of phase boundaries for a given composite
+        With h, r, T ranges of length N_h, N_r, N_T
+        Returns:
+            boundaries      [N_boundary] array of points on boundary
+            boundaryVals    
+            boundaryData    """
 
     # Find where changes in phase occur *along temperature axis*
     diffs = np.diff(phases)
@@ -808,8 +823,8 @@ def find_3D_phase_boundaries_main_params(thetaL, h_range=1e-3*np.arange(0.5,2.1,
     boundaryT = np.array([T_range[i] for i in boundaries[:,2]]).reshape((-1,1))
     boundaryh = np.array([1000*h_range[i] for i in boundaries[:,0]]).reshape((-1,1))
     boundaryr = np.array([r_range[i] for i in boundaries[:,1]]).reshape((-1,1))
-
     boundaryVals = boundaryVals.reshape((-1,1))
+    
     boundaryData = np.concatenate((boundaryT, boundaryh, boundaryr, boundaryVals), axis=1)
     boundaryData = boundaryData[boundaryData[:,-1].argsort(kind='mergesort')]
 
@@ -817,16 +832,16 @@ def find_3D_phase_boundaries_main_params(thetaL, h_range=1e-3*np.arange(0.5,2.1,
     
 
 def plot_isotherm(r, T, phases, angle0_vals,
-                         h_range=1e-3*np.arange(0.5,2.1,0.01),
-                         thetaL_range=np.radians(np.arange(-15.0,15.1,0.1)),
-                         T_range=np.arange(25.0,105.0,25.0), savedir='', closeFlag=True):
-    ''' Plot isotherm phase diagram for a given composite r: h vs total equilibrium angle
-        at a particular temperature T'''
+                  h_range=1e-3*np.arange(0.5,2.1,0.01),
+                  thetaL_range=np.radians(np.arange(-15.0,15.1,0.1)),
+                  T_range=np.arange(25.0,105.0,25.0), savedir='', closeFlag=True):
+    """ Plot isotherm phase diagram for a given composite r: h vs total equilibrium
+        angle at a particular temperature T"""
     
     # Find where in simulation data the desired T value occurs
     i_T = np.argwhere(T_range == T)[0][0]
-    #assert i_T, "Choose a value of T that is in T_range; specify T_range if not default"
     
+    # Plot
     colors = ['xkcd:light red', 'xkcd:apple green', 'xkcd:apple green', 'xkcd:apple green', 'xkcd:electric blue', 'xkcd:electric blue', 'xkcd:electric blue']
     fig = plt.figure(dpi=200)
     ax = fig.gca()
@@ -836,11 +851,12 @@ def plot_isotherm(r, T, phases, angle0_vals,
     diagram = ax.imshow(Z, extent=[X.min(), X.max(), Y.min(), Y.max()],
                         origin='lower', aspect='auto', cmap=col.ListedColormap(colors))           
     
-    # Formatting
+    # Format
     plt.title(r'$T$ = {0}$^\circ$C, $r$ = {1:0.2f}'.format(int(T), r), size=18)
     plt.xlabel(r'$h$ (mm)')
     plt.ylabel(r'$\theta_L$ (degrees)')
     
+    # Save and close
     if savedir != '':
         figname = 'isotherm_{0}C_r{1:0.2f}.png'.format(int(T), r)
         plt.savefig(os.path.join(savedir, figname),dpi=200)
@@ -850,15 +866,16 @@ def plot_isotherm(r, T, phases, angle0_vals,
     return
 
 def plot_main_parameter_isotherm(thetaL, T, phases, angle0_vals,
-                         h_range=1e-3*np.arange(0.5,2.1,0.01),
-                         r_range=np.radians(np.arange(0.0, 1.0, 0.01)),
-                         T_range=np.arange(25.0,105.0,25.0), savedir='', closeFlag=True):
-    ''' Plot isotherm phase diagram for a given value of theta_L: h vs r
-        at a particular temperature T'''
+                                 h_range=1e-3*np.arange(0.5,2.1,0.01),
+                                 r_range=np.radians(np.arange(0.0, 1.0, 0.01)),
+                                 T_range=np.arange(25.0,105.0,25.0), savedir='', closeFlag=True):
+    """ Plot isotherm phase diagram for a given value of theta_L: h vs r
+        at a particular temperature T"""
     
     # Find where in simulation data the desired T value occurs
     i_T = np.argwhere(T_range == T)[0][0]
     
+    # Plot
     colors = ['xkcd:light red', 'xkcd:apple green', 'xkcd:apple green', 'xkcd:apple green', 'xkcd:electric blue', 'xkcd:electric blue', 'xkcd:electric blue']
     fig = plt.figure(dpi=200)
     ax = fig.gca()
@@ -868,11 +885,12 @@ def plot_main_parameter_isotherm(thetaL, T, phases, angle0_vals,
     diagram = ax.imshow(Z, extent=[X.min(), X.max(), Y.min(), Y.max()],
                         origin='lower', aspect='auto', cmap=col.ListedColormap(colors))           
     
-    # Formatting
+    # Format
     plt.title(r'$T$ = {0}$^\circ$C, $\theta_L$ = {1:0.1f}'.format(int(T), thetaL), size=18)
     plt.xlabel(r'$h$ (mm)')
     plt.ylabel(r'$r$')
     
+    # Save and close
     if savedir != '':
         figname = 'isotherm_mainParams_{0}C.png'.format(int(T))
         plt.savefig(os.path.join(savedir, figname),dpi=200)
@@ -882,23 +900,18 @@ def plot_main_parameter_isotherm(thetaL, T, phases, angle0_vals,
     return
 
 
-
 def save_isotherms(datestr, resdir, minima, i_isotherm, h_range, thetaL_range, T_range, tag=''):
-    ''' Given i_isotherm corresponding to index in T_range for which to plot isotherms,
-        save individual isothersm to csv and vtk '''
+    """ Given i_isotherm corresponding to index in T_range for which to plot,
+        save individual isothersm to csv and vtk """
 
-    x = np.array([1000*h for h in h_range])#.reshape((-1,1))
+    x = np.array([1000*h for h in h_range])
     if tag=='':
-        y = np.array([np.degrees(theta) for theta in thetaL_range])#.reshape((-1,1))
+        y = np.array([np.degrees(theta) for theta in thetaL_range])
     else:
         y = thetaL_range
-    #xmesh, ymesh = np.meshgrid(x, y)
-    #xvec = xmesh.reshape((-1,1))
-    #yvec = ymesh.reshape((-1,1)) 
         
     for count, index in enumerate(i_isotherm):
-        isotherm_vals = minima[:,:,index]#.reshape((-1,1))
-        #isothermData = np.concatenate((xvec, yvec, isotherm_vals), axis=1)
+        isotherm_vals = minima[:,:,index]
         isotherm_file_base = os.path.join(resdir, '{0}_isotherm{1}_{2}'.format(datestr, tag, count))
         data2vtk_rectilinear(x, y, T_range[index], isotherm_vals, isotherm_file_base)
     
@@ -906,12 +919,13 @@ def save_isotherms(datestr, resdir, minima, i_isotherm, h_range, thetaL_range, T
 
 
 def save_boundaries(datestr, cwd, boundaries, boundaryData, boundaryVals, tag=''):
-    ''' Given boundary values, save to csv and vtk '''
+    """ Given boundary values, save to csv and vtk """
     
     boundaries_file = os.path.join(cwd, '{0}_boundaries{1}.csv'.format(datestr, tag))
     boundaryVals_file = os.path.join(cwd, '{0}_boundaryVals{1}.csv'.format(datestr, tag))
     boundaryData_file = os.path.join(cwd, '{0}_boundaryData{1}.csv'.format(datestr, tag))
     
+    # Export files containing all data
     export_to_csv(boundaries_file, boundaries, fmt='%d',
                   variables=["T index", "h index", "thetaL index"],
                   units=["index","index","index"])
@@ -933,12 +947,12 @@ def save_boundaries(datestr, cwd, boundaries, boundaryData, boundaryVals, tag=''
             csv2vtk_unstructured(fname)
         else:
             nanCounter += 1
+            
     print("nan count: {0}".format(nanCounter))
-    return
 
    
 def data2vtk_rectilinear(x, y, z_val, values, basename):
-    ''' Create vtk file of rectilinear grid type from x, y, array csv file '''  
+    """ Create vtk file of rectilinear grid type from x, y, array csv file """  
     nx = len(x)
     ny = len(y)
     nz = 1
@@ -962,10 +976,11 @@ def data2vtk_rectilinear(x, y, z_val, values, basename):
             for i in range(nx):
                 f.write("{0} ".format(values[i,j]))
         f.write("\n")
-    return
+
 
 def csv2vtk_unstructured(fname):
-    ''' Create vtk file of unstructured grid type from csv array '''
+    """ Create vtk file of unstructured grid type from csv array """
+    
     basename = os.path.splitext(fname)[0]
     points = np.genfromtxt(fname,delimiter=", ",skip_header=1)
     value = int(basename[-1]) # Get surface number from filename
@@ -991,30 +1006,12 @@ def csv2vtk_unstructured(fname):
         f.write("LOOKUP_TABLE default\n")
         for i in range(0, nPoints):
             f.write("{0}\n".format(value))
-    return
 
 
-#%%
-
-def test_MetamaterialModel(h_total, ratio, thetaL, T):
-    ''' Sanity check performance of MetamaterialModel class '''
-    t0 = time.perf_counter() 
-    sample = MetamaterialModel(h_total=h_total, ratio=ratio, thetaL=thetaL, T=T, b=[0.0,1.5])
-    t1 = time.perf_counter() 
-    sample.update_T(100.0)
-    t2 = time.perf_counter() 
-    sample = MetamaterialModel(h_total=h_total, ratio=ratio, thetaL=thetaL, T=T, b=[0.0,1.5],
-                               plotFlag=True, verboseFlag=True)
-    t3 = time.perf_counter() 
-    print(" Base version:\t\t {0:.2e} s\n Updating T:\t\t {1:.02e} s\n Verbose version:\t {2:0.2e} s".format(t1-t0, t2-t1, t3-t2))
-    print("h={0}mm, r={1}, theta_L={2:0.1f}deg @ T={3}C".format(h_total, ratio, np.degrees(thetaL), int(T)))
-    print("Equivalent torsional spring constant: {0:.3f} Nmm".format(1e3*sample.hinge.k))
-        
-    return True
-    
 def plot_energy_concept(h_total, ratio, thetaL, T_range, 
                         b=[], k_sq=0.0, m=0.1471, limFlag='exp', p_lim=[3e-22, 51],
                         bilayerDict={}, figdir=''):
+    """ Plot energy concept diagram for first figure in manuscript """
     
     sample = MetamaterialModel(h_total=h_total, ratio=ratio, thetaL=thetaL, T=T_range[0],
                                k_sq=k_sq, m=m, limFlag=limFlag, p_lim=p_lim,
@@ -1046,8 +1043,30 @@ def plot_energy_concept(h_total, ratio, thetaL, T_range,
     plt.savefig(os.path.join(figdir,'{0}.png'.format('energy_concept')))
     plt.savefig(os.path.join(figdir,'{0}.svg'.format('energy_concept')))
 
-#%%
-    
+
+# -----------------------------------------------------------------------------
+# Tests
+# -----------------------------------------------------------------------------
+def test_MetamaterialModel(h_total, ratio, thetaL, T):
+    """ Sanity check performance of MetamaterialModel class """
+    t0 = time.perf_counter() 
+    sample = MetamaterialModel(h_total=h_total, ratio=ratio, thetaL=thetaL, T=T, b=[0.0,1.5])
+    t1 = time.perf_counter() 
+    sample.update_T(100.0)
+    t2 = time.perf_counter() 
+    sample = MetamaterialModel(h_total=h_total, ratio=ratio, thetaL=thetaL, T=T, b=[0.0,1.5],
+                               plotFlag=True, verboseFlag=True)
+    t3 = time.perf_counter() 
+    print(" Base version:\t\t {0:.2e} s\n Updating T:\t\t {1:.02e} s\n Verbose version:\t {2:0.2e} s".format(t1-t0, t2-t1, t3-t2))
+    print("h={0}mm, r={1}, theta_L={2:0.1f}deg @ T={3}C".format(h_total, ratio, np.degrees(thetaL), int(T)))
+    print("Equivalent torsional spring constant: {0:.3f} Nmm".format(1e3*sample.hinge.k))
+        
+    return True
+
+
+# -----------------------------------------------------------------------------
+# Main
+# ----------------------------------------------------------------------------- 
 if __name__ == "__main__":
     cwd = os.path.dirname(os.path.abspath(__file__))
     split = os.path.split(cwd)
@@ -1066,7 +1085,7 @@ if __name__ == "__main__":
         theta0 = np.load(theta0_file)
         print("\tLoaded parameters, minima, phases, theta_T, and theta_0")
     except IOError:"""
-    '''print("\tRunning new parameter-space analysis...")    
+    """print("\tRunning new parameter-space analysis...")    
     #r_range = np.arange(0.1,0.95,0.1)
     r_range = np.array([0.377]) #r_const average value
     h_range = 1e-3*np.arange(0.5,2.1,0.01)
@@ -1076,7 +1095,7 @@ if __name__ == "__main__":
                        h_range=h_range,
                        thetaL_range=thetaL_range,
                        T_range=T_range,
-                       savedir=tmpdir)'''
+                       savedir=tmpdir)"""
     h_val = 0.0007
     r_val = 0.25
     sample = MetamaterialModel(h_total=h_val, ratio=r_val, thetaL=0.0, T=25.0, b=[0.0,1.5],

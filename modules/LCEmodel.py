@@ -176,13 +176,19 @@ def fit_LCE_modulus_avg(sourcedir, saveFlag=False, figdir='', verboseFlag=False)
     T_RT = []
     E_s_RT = []
     E_l_RT = []
+    E_s_vals = []
+    T_vals = []
     for filename in filelist:
         # Import data
         data = np.genfromtxt(os.path.join(sourcedir, filename), skip_header=2, delimiter='\t')
         if data.ndim == 2: # temperature ramp
             E_s = abs(data[:,1])
-            E_l = abs(data[:,2])
+            E_l = abs(data[:,2])            
             T = data[:,4]
+            
+            E_s_vals.append(E_s)
+            T_vals.append(T)
+            
             # Smooth and crop data
             windowSize = 2
             cropIndex = math.ceil(windowSize/2)
@@ -265,15 +271,20 @@ def fit_LCE_modulus_avg(sourcedir, saveFlag=False, figdir='', verboseFlag=False)
     plt.fill_between(T_avg, 1e-6*(Es_avg-Es_std), 1e-6*(Es_avg+Es_std), color='r', alpha=0.2)
     plt.plot(T_avg, 1e-6*El_avg, 'b', label="E''")
     plt.fill_between(T_avg, 1e-6*(El_avg-El_std), 1e-6*(El_avg+El_std), color='b', alpha=0.2)
+    #for i in range(len(E_s_vals)):
+    #    E_val = E_s_vals[i]
+    #    T_val = T_vals[i]
+    #    plt.plot(T_val, 1e-6*E_val, '.r', label="E'", markersize=5)
     plt.plot(T_avg, 1e-6*model_elastic_modulus(T_avg, *params),
              'k', linewidth=1, linestyle='-',label="Exponential fit to E'")
-    plt.errorbar(T_RT_avg, 1e-6*Es_RT_avg, xerr=T_RT_std, yerr=1e-6*Es_RT_std, capsize=4, fmt='.', color='r', label="E' (RT)")
-    plt.errorbar(T_RT_avg, 1e-6*El_RT_avg, xerr=T_RT_std, yerr=1e-6*El_RT_std, capsize=4, fmt='.', color='b', label="E'' (RT)")
+    #plt.errorbar(T_RT_avg, 1e-6*Es_RT_avg, xerr=T_RT_std, yerr=1e-6*Es_RT_std, capsize=4, fmt='.', color='r', label="E' (RT)")
+    #plt.errorbar(T_RT_avg, 1e-6*El_RT_avg, xerr=T_RT_std, yerr=1e-6*El_RT_std, capsize=4, fmt='.', color='b', label="E'' (RT)")
     plt.xlabel("Temperature ($^\circ$C)")
     plt.ylabel("Modulus (MPa)")
     ax = fig.gca()
     ax.set_yscale('log')
     plt.ylim([.01, 10])
+    plt.xlim([25, 100])
     plt.legend(loc="lower left")
     
     if saveFlag:
