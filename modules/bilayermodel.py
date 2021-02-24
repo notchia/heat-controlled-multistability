@@ -55,6 +55,7 @@ class BilayerModel:
         self.h_LCE =  h_total*ratio        # [m] hinge thickness, LCE. Assume LCE is on "inside" of hinge
         
         self.I_PDMS, self.I_LCE = self._calculate_2nd_moments()
+        self.I_PDMS_NA, self.I_LCE_NA = self._calculate_2nd_moments_neutral_axis()
         self.k = self._calculate_stiffness() # [m] stiffness of composite hinge
         self.curvature = self._calculate_curvature(T)
         self.thetaT = self._calculate_angle(T)
@@ -83,27 +84,38 @@ class BilayerModel:
         
     def _calculate_stiffness(self):
         ''' Using physical parameters, calculate effective linear spring constant 
-            from beam theory, assuming a rectangular beam bending in thickness. '''
-        k0 = (self.E_PDMS*self.I_PDMS + self.E_LCE*self.I_LCE)/self.s
+            from beam theory, assuming a rectangular beam bending in thickness. 
+            Second moments of area are defined about the neutral axis.'''
+        k0 = (self.E_PDMS*self.I_PDMS_NA + self.E_LCE*self.I_LCE_NA)/self.s
         return k0  
 
 
     def _calculate_2nd_moments(self):
         ''' Calculate 2nd moments of area of PDMS and LCE layers individually  '''
+        # 2nd moments of area w.r.t. their own axes                                          
+        I_PDMS = self.w*self.h_PDMS**3/12
+        I_LCE = self.w*self.h_LCE**3/12
+        
+        return I_PDMS, I_LCE
+    
+    
+    def _calculate_2nd_moments_neutral_axis(self):
+        ''' Shift 2nd moments of area of PDMS and LCE to be about neutral axis '''
         # Location of effective neutral axis w.r.t. PDMS surface
         h0 = ((self.E_PDMS*self.h_PDMS**2/2 + self.E_LCE*self.h_LCE**2/2
                + self.E_LCE*self.h_PDMS*self.h_LCE)/(self.E_PDMS*self.h_PDMS
                                                      + self.E_LCE*self.h_LCE))
+                                                     
         # 2nd moments of area w.r.t. neutral axis (parallel axis theorem)                                            
-        I_PDMS = (self.w*self.h_PDMS**3/12) + self.w*self.h_PDMS*(
-            h0 - self.h_PDMS/2)**2
-        I_LCE = (self.w*self.h_LCE**3/12) + self.w*self.h_LCE*(
-            self.h_total - h0 - self.h_LCE/2)**2
+        I_PDMS_NA = self.I_PDMS + self.w*self.h_PDMS*(h0 - self.h_PDMS/2)**2
+        I_LCE_NA  = self.I_LCE  + self.w*self.h_LCE*(self.h_total - h0 - self.h_LCE/2)**2
         
-        return I_PDMS, I_LCE
+        return I_PDMS_NA, I_LCE_NA
+
     
     def _calculate_curvature(self, T):
-        ''' Calculate curvature [1/m] at a given temperature '''
+        ''' Calculate curvature [1/m] at a given temperature.
+            Second moments of area are defined about each component's center. '''
         if self.ratio == 0:
             kappa = 0
         else:
