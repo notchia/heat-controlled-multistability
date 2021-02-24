@@ -375,57 +375,28 @@ def analyze_bending_data_200819(paramfile, datafile, LCE_modulus_params=[], LCE_
     angle_avg = 1e-3*np.multiply(h,curvature_change_avg)
     angle_std = 1e-3*np.multiply(h,curvature_std)
     angle_model = 1e-3*np.multiply(h,curvature_model)
+    
     plot_values_with_temperature(angle_avg, angle_std,
                                  y_model=angle_model,
                                  title='bilayer_temperature-angle_model',
-                                 ylabel='Normalized curvature change\n$h(\kappa - \kappa_0)$')
+                                 ylabel='Normalized curvature change\n$h(\kappa - \kappa_0)$')    
 
-    # Change in normalized curvature (curvature normalized by r): 
-    normalized_curvature_avg = np.divide(curvature_change_avg, r)
-    normalized_curvature_std = np.divide(curvature_std, r)
-    normalized_curvature_model = np.divide(curvature_change_model, r)        
+    # Change in normalized curvature (curvature normalized by multiplication by r^2): 
+    normalized_curvature_r2_avg = np.multiply(curvature_change_avg, np.square(r))
+    normalized_curvature_r2_std = np.multiply(curvature_std, np.square(r))
+    normalized_curvature_r2_model = np.multiply(curvature_change_model, np.square(r))  
 
     # Change in normalized angle (curvature normalized by h and r): 
-    normalized_angle_avg = 1e-3*np.multiply(h, normalized_curvature_avg)
-    normalized_angle_std = 1e-3*np.multiply(h, normalized_curvature_std)
-    normalized_angle_model = 1e-3*np.multiply(h, normalized_curvature_model)
+    normalized_angle_r2_avg = 1e-3*np.multiply(h, normalized_curvature_r2_avg)
+    normalized_angle_r2_std = 1e-3*np.multiply(h, normalized_curvature_r2_std)
+    normalized_angle_r2_model = 1e-3*np.multiply(h, normalized_curvature_r2_model)
 
-    # Change in normalized curvature (curvature normalized by ln(r)): 
-    log_r = -np.log(r)
-    normalized_curvature_log_avg = np.divide(curvature_change_avg, log_r)
-    normalized_curvature_log_std = np.divide(curvature_std, log_r)
-    normalized_curvature_log_model = np.divide(curvature_model, log_r)
-
-    # Change in normalized angle (curvature normalized by h and ln(r)): 
-    normalized_angle_log_avg = 1e-3*np.multiply(h, normalized_curvature_log_avg)
-    normalized_angle_log_std = 1e-3*np.multiply(h, normalized_curvature_log_std)
-    normalized_angle_log_model = 1e-3*np.multiply(h, normalized_curvature_log_model)
-    plot_values_with_temperature(normalized_angle_log_avg, normalized_angle_log_std,
-                                 y_model=normalized_angle_log_model,
-                                 title='bilayer_temperature-logangle_model',
-                                 ylabel='Normalized curvature change\n$h(\kappa - \kappa_0)/(-\ln(r))$')
-
-    if verboseFlag:
-        plot_values_with_temperature(curvature_change_avg, curvature_std,
-                                     y_model=curvature_change_model,
-                                     title='bilayer_temperature-curvature_model',
-                                     ylabel='Change in curvature $\kappa-\kappa_0$ (1/m)')
-        plot_values_with_temperature(normalized_curvature_avg, normalized_curvature_std,
-                                     y_model=normalized_curvature_model,
-                                     title='bilayer_temperature-normcurvature_model',
-                                     ylabel='Normalized curvature change\n$(\kappa - \kappa_0)/r$ (1/m)')
-        plot_values_with_temperature(normalized_angle_avg, normalized_angle_std,
-                                     y_model=normalized_angle_model,
-                                     title='bilayer_temperature-normangle_model',
-                                     ylabel='Normalized curvature change\n$h(\kappa - \kappa_0)/r$')
-        plot_values_with_temperature(normalized_curvature_log_avg, normalized_curvature_log_std,
-                                     y_model=normalized_curvature_log_model,
-                                     title='bilayer_temperature-logcurvature_model',
-                                     ylabel='Normalized curvature change\n$(\kappa - \kappa_0)/(-\ln(r))$ (1/m)')
+    plot_values_with_temperature(normalized_angle_r2_avg, normalized_angle_r2_std,
+                                 y_model=normalized_angle_r2_model,
+                                 title='bilayer_temperature-angle_model_norm',
+                                 ylabel='Normalized curvature change\n$hr^2(\kappa - \kappa_0)$')
 
     # Can the curvature be normalized by some values? -------------------------
-    # Relation to LCE:total thickness ratio r:
-
     def plot_values_with_parameter(x_avg, x_std, y_avg, y_std,
                                    title='', xlabel='', ylabel='',
                                    fitFlag=False):
@@ -451,72 +422,25 @@ def analyze_bending_data_200819(paramfile, datafile, LCE_modulus_params=[], LCE_
         return
         
     # Relation to composite ratio r
-
     plot_values_with_parameter(r, r_std, angle_avg, angle_std,
                                title='bilayer_ratio-normcurvature',
                                xlabel='LCE:total ratio $r$ (mm/mm)',
                                ylabel='Normalized curvature change $h(\kappa - \kappa_0)$')
 
-    # Relation to total thickness h
-    plot_values_with_parameter(h, h_std, normalized_curvature_avg, normalized_curvature_std,
-                               title='bilayer_thickness-curvature1',
+    # Relation to total thickness h, showing independence
+    plot_values_with_parameter(h, h_std, angle_avg, angle_std,
+                               title='bilayer_thickness-curvature',
                                xlabel='Total thickness $h$ (mm)',
-                               ylabel='Normalized curvature change $(\kappa - \kappa_0)/r$')
-
-    # Relation to total thickness h
-    plot_values_with_parameter(h, h_std, normalized_angle_avg, normalized_angle_std,
-                               title='bilayer_thickness-curvature2',
-                               xlabel='Total thickness $h$ (mm)',
-                               ylabel='Normalized curvature change $h(\kappa - \kappa_0)/r$')
+                               ylabel='Normalized curvature change $h(\kappa - \kappa_0)$')
     
-    """
-    # Scale the model by a fit to h. Really what should be done is finding fit_to_h
-    # for each temperature, then fitting a curve to how the slope of the fit
-    # changes with temperature. Right now the fit is probably good enough that
-    # this is unnecessary.
-    normalized_adjusted_curvature = adjust_by_h(h, r, normalized_curvature_model, fit_to_h=fit_to_h, h_ref=h[0])
-    plt.figure('temp-curvature-model-adjust-norm', dpi=200)
-    plt.xlabel("Temperature ($^{{\circ}}C$)")
-    plt.ylabel("Normalized change in curvature $(\kappa - \kappa_0)/r$,\n     adjusted model (1/m)")
-    for i in range(nCombos):
-        labelstr="h = {0:.1f} mm, r = {1:.2f}".format(h[i], r[i])
-        plt.errorbar(T, normalized_curvature_avg[:,i], yerr=normalized_curvature_std[:,i], fmt='o', capsize=2,
-                     label=labelstr, color=colors[i])
-        plt.plot(T_range, normalized_adjusted_curvature[:,i], linestyle='dashed',
-                 linewidth=2, color=colors[i],label='model: '+labelstr)
-    plt.legend()
-    plt.tight_layout()"""
-
     return
-
-"""
-def adjust_by_h(h_vals, r_vals, modeled_curvature, fit_to_h=[1,0], h_ref=0):
-    ''' Take array of N h_vals and N r_vals corresponding to the (N,M) cuvatures
-    (for M temperature points) and the coefficients of a linear polyfit fit_to_h
-    and return the adjusted curvatures'''
-    assert modeled_curvature.shape[1] == len(h_vals) and modeled_curvature.shape[1] == len(r_vals)
-    nSamples = modeled_curvature.shape[1]
-    adjusted_curvature = np.zeros_like(modeled_curvature)
-
-    for i in range(nSamples):
-        h = h_vals[i]
-        r = r_vals[i]
-        adjustment = get_h_adjustment_coeff(h, r, fit_to_h, h_ref)
-        adjusted_curvature[:,i] = modeled_curvature[:,i]*adjustment
-    return adjusted_curvature
-
-def get_h_adjustment_coeff(h, r, fit_to_h, h_ref):
-    ''' Using a fit to normalized_curvature as a function of h at a certain r value'''
-    normalized_adjustment = (fit_to_h[0]*(h - h_ref))/(fit_to_h[0]*h_ref + fit_to_h[1])
-    adjustment = 1 + normalized_adjustment*0.7
-    return adjustment"""
 
     
 def analyze_curvature_change_with_temp(LCE_modulus_params=[],LCE_strain_params=[],
                                    saveFlag=False, figdir='', verboseFlag=False):
     ''' 2D color plot of angle on h-T axes '''
-    #h_range = 1e-3*np.arange(0.5,2.5,0.5) #[m]
-    h_range = 1e-3*np.array([1.0])
+    h_range = 1e-3*np.arange(0.5,2.5,0.5) #[m]
+    #h_range = 1e-3*np.array([1.0])
     r_range = np.arange(0.01,1.0,0.01)
     T_range = np.arange(25,101,1)
     
