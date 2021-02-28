@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Fit experimental data for magnet strenth. From main data analysis script, call
 the following function:
@@ -16,13 +15,13 @@ import matplotlib.pyplot as plt
 import scipy.optimize as opt
 import os
 import re
-import math
 
 from modules import tensiletest
 
+
 def model_force (d, m):
-    ''' Model force at a given distance between two identical attracting
-        magnets, assuming them to be point dipoles, given the magnetic moment '''
+    """ Model force at a given distance between two identical attracting
+        magnets, assuming them to be point dipoles, given the magnetic moment """
     
     mu0 = 1.256637*10**(-6) # magnetic permeability of free space
     F = (3*mu0*m**2)/(2*np.pi*d**4)
@@ -31,12 +30,12 @@ def model_force (d, m):
 
 def fit_magnet_force(filename, zeroDisp=0, speed=1, filterFlag=False,
                      figFlag=False, saveFlag=False, figdir='', ):
-    ''' Fit cycles of force-displacement data to dipole model.  
+    """ Fit cycles of force-displacement data to dipole model.  
         Check that the optional parameter values are correct for the test: 
             zeroDisp:   [mm] true distance between centers of squares at zero
                         displacement, as measured in ImageJ from photo
             speed:      [mm/s] test speed
-    '''
+    """
     
     # Import data; split multicycle array into tension and compression for each
     cols = [0,1,4] #time, load, cycle number
@@ -68,15 +67,16 @@ def fit_magnet_force(filename, zeroDisp=0, speed=1, filterFlag=False,
         plt.title(os.path.split(filename)[-1])
         plt.legend()
         if saveFlag:
-            plt.savefig(os.path.join(figdir,"magnet_force_fit.png"),dpi=300)
+            plt.savefig(os.path.join(figdir, "magnet_force_fit.png"),dpi=300)
     
     return params, model_force
 
+
 def fit_magnet_forces(sourcedir, zeroDisp=0, saveFlag=False, figdir=''):
-    ''' Fit magnetic moment (assuming point dipoles) to all data in source
-        directory, then find and return average of these '''
+    """ Fit magnetic moment (assuming point dipoles) to all data in source
+        directory, then find and return average of these """
     filelist = os.listdir(sourcedir)
-    #nT = len(filelist)
+
     m_list = []
     for i, fname in enumerate(filelist):
         if os.path.splitext(fname)[-1] == '.csv':
@@ -95,14 +95,16 @@ def fit_magnet_forces(sourcedir, zeroDisp=0, saveFlag=False, figdir=''):
     
 
 def determine_temp_dependence(sourcedir, zeroDisp=0, saveFlag=False, figdir=''):
-    ''' Determine if magnetic moment drops degrades after exposure to high 
+    """ Determine if magnetic moment drops degrades after exposure to high 
         temperatures. For each test, the same pair of magnets was exposed to
-        the given temperatures, in increasing order '''
+        the given temperatures, in increasing order """
     
     filelist = os.listdir(sourcedir)
     nT = len(filelist)
     T = np.zeros(nT)
     m = np.zeros(nT)
+    
+    # Fit magnet force-displacement for each test
     for i, fname in enumerate(filelist):
         fullpath = os.path.join(sourcedir, fname)
         temp = os.path.splitext(fname)[0].split('_')[-1]
@@ -110,14 +112,16 @@ def determine_temp_dependence(sourcedir, zeroDisp=0, saveFlag=False, figdir=''):
         params, model = fit_magnet_force(fullpath, zeroDisp=zeroDisp)
         m[i] = params[0]
  
+    # Plot temperature-moment relation
     plt.figure('magnet_temperature_test',dpi=200)
     plt.title("Magnetic strength degradation")
     plt.xlabel("$T$ ($^\circ$C)")
     plt.ylabel("$m$ (NA$^2$)")
     plt.plot(T, m, 'ok')
+    
     if saveFlag:
-        plt.savefig(os.path.join(figdir,"magnet_temp_dependence.svg"), transparent=True)
-        plt.savefig(os.path.join(figdir,"magnet_temp_dependence.png"), dpi=200)
+        plt.savefig(os.path.join(figdir, "magnet_temp_dependence.svg"), transparent=True)
+        plt.savefig(os.path.join(figdir, "magnet_temp_dependence.png"), dpi=200)
     
     return
 
@@ -127,6 +131,6 @@ if __name__ == '__main__':
     split = os.path.split(cwd)
     if split[1] == 'modules':
         cwd = split[0]
-    rawdir = os.path.join(cwd,"data/raw/magnet_properties")
-    tmpdir = os.path.join(cwd,"tmp")
+    rawdir = os.path.join(cwd, "data/raw/magnet_properties")
+    tmpdir = os.path.join(cwd, "tmp")
     

@@ -1,5 +1,4 @@
-# -*- coding: utf-8 -*-
-'''
+"""
 Fit experimental data for LCE contraction and elastic modulus. From main data
 analysis script, call the following functions:
     plist, fcn = fit_LCE_contraction(fullpath)
@@ -10,7 +9,7 @@ with
     fcn:        function for which fitting parameters were found 
     
 @author: Lucia Korpas
-'''
+"""
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -24,22 +23,26 @@ from modules import tensiletest
 
 
 def model_elastic_modulus(T, dE, T0, E0):
-    ''' Young's modulus as exponential + constant '''
+    """ Young's modulus as exponential + constant.
+        Used as parameter input in bilayer model """
     E = np.exp(dE*(T - T0)) + E0
     return E
 
 def model_strain(x, ds, T0, s0):
-    ''' Strain modeled as exponential + constant '''
+    """ Strain modeled as exponential + constant.
+        Used as input parameter in bilayer model """
     strain = -np.exp(ds*(x - T0)) + s0
     return strain
 
 
 # Import and analyze experiments relating to this model -----------------------
 def fit_LCE_strain(filepath, saveFlag=False, figdir=''):
-    ''' Fit LCE contraction strain data (lengths at different temperatures, 
+    """ Fit LCE contraction strain data (lengths at different temperatures, 
         measured from photos in ImageJ and tabulated) to an empirical model.
         - Input experimental data path with mm2px conversion in the name
-        - Returns the fitting parameters list and the model function '''
+        - Takes mean and stdev and plots with errorbars
+        - Finds and plots the best-fit model
+        - Returns (a) the fitting parameters list and (b) the model function """
     
     # Import data, convert to lengths/strains, and take mean and stdev
     conversion = os.path.splitext(os.path.split(filepath)[-1])[0].split('_')[-1]
@@ -52,6 +55,7 @@ def fit_LCE_strain(filepath, saveFlag=False, figdir=''):
     avg_strain = np.mean(strain, axis=1)
     std_strain = np.std(strain, axis=1)
 
+    # Plot temperature-strain relation with error bars
     plt.figure(dpi=200)
     plt.errorbar(T, avg_strain, yerr=std_strain, linewidth=0.0, label="experiment",
                  marker='o', color='r', capsize=4, elinewidth=2)  
@@ -67,108 +71,30 @@ def fit_LCE_strain(filepath, saveFlag=False, figdir=''):
     modelstr = "LCE fit:\t strain = -exp({0:.6f}(T-{1:.2f})) + {2:.4e}".format(*params)
     print(modelstr)
 
+    # Format
     plt.xlabel("Temperature ($^{\circ}$C)")
     plt.ylabel("Strain $\epsilon$ (mm/mm)")
     plt.plot(T_model, L_model, linestyle='-', color='k', linewidth=2, zorder=3,
              label="exponential fit up to {0}$^\circ$C".format(maxTemp))
     plt.legend()
+    
     if saveFlag:
-        plt.savefig(os.path.join(figdir,'LCE_strain.svg'))
-        plt.savefig(os.path.join(figdir,'LCE_strain.png'),dpi=200)
+        plt.savefig(os.path.join(figdir, 'LCE_strain.svg'))
+        plt.savefig(os.path.join(figdir, 'LCE_strain.png'),dpi=200)
 
     return params, model_strain
 
-def fit_LCE_contraction_200316(filename, saveFlag=False, figdir=''):
-    ''' Fit LCE contraction strain data (lengths at different temperatures, 
-        measured from photos in ImageJ and tabulated) to an empirical model.
-        In this version, both strips and squares of the material were tested.
-        - Takes experimental data path
-        - Returns the fitting parameters list and the model function '''
-    # Import data and convert to strain
-    data = np.genfromtxt(filename, delimiter=',',skip_header=1)
-    T = data[:,0]
-    L_strip = data[:,1:4]
-    L_square = data[:,4:7]
-    strain_strip = (L_strip-L_strip[0,:])/L_strip[0,:]
-    strain_square = (L_square-L_square[0,:])/L_square[0,:]
-    strain_strip_avg = np.mean(strain_strip, axis=1)
-    strain_square_avg = np.mean(strain_square, axis=1)
-    strain_strip_std = np.std(strain_strip, axis=1)
-    strain_square_std = np.std(strain_square, axis=1)
-    errorT = 2.0 # [degrees C]
-    
-    # Fit model to data
-    p_guess = [1, 0.001] # A, B
-    params = opt.curve_fit(model_strain, T, strain_strip_avg, p0=p_guess)[0]
-    
-    # Plot strain-temperature data and model with error bars and fit
-    plt.figure(dpi=200)
-    plt.errorbar(T, strain_strip_avg, yerr=strain_strip_std, xerr=errorT,
-                 fmt='', marker='o', color='r', capsize=4, elinewidth=2, label="strip")
-    plt.errorbar(T, strain_square_avg, yerr=strain_square_std, xerr=errorT,
-                 fmt='', marker='o', color='g', capsize=4, elinewidth=2, label="square")
-    plt.plot(T, model_strain(T, params[0], params[1]),
-             linestyle='-', color='k', linewidth=1, zorder=3, label="exponential fit to strip")
-    plt.xlabel("Temperature ($^\circ$C)")
-    plt.ylabel("Strain along print direction")
-    plt.legend()
-    
-    modelstr = "y = -exp({0:0.6f}(x - {1:0.2f}))".format(params[0], params[1])
-    print(modelstr)
 
-    if saveFlag:
-        plt.savefig(os.path.join(figdir, "LCE_strain.svg"), transparent=True)
-        plt.savefig(os.path.join(figdir, "LCE_strain.png"), dpi=200)
-    
-    return params, model_strain
-"""
-def fit_LCE_modulus(filename, saveFlag=False, figdir=''):
-    ''' Fit LCE elastic modulus data (from DMA) to a mostly-empirical model.
-        - Takes experimental data path
-        - Returns the fitting parameters list and the model function
-         NOT CURRENTLY USED'''
-    # Import data and convert to strain
-    data = np.genfromtxt(filename, skip_header=2, delimiter='\t')
-    E_s = data[:,1]
-    E_l = data[:,2]
-    #E_star = data[:,5] #4 for earlier data
-    T = data[:,4] #7 for earlier data
-
-    p_guess = [-0.07, 62, 0.7] # dy, T0, y0
-    params = opt.curve_fit(model_elastic_modulus, T, E_s, p0=p_guess)[0]
-  
-    # Semilog plot shear, loss, total, and Young's moduli and fit 
-    fig = plt.figure('LCE_modulus', dpi=300)
-    #plt.plot(T, 1e-6*E_star, '.g', label="E*")
-    plt.plot(T, 1e-6*E_s, '.r', label="E'")
-    plt.plot(T, 1e-6*E_l, '.b', label="E''")
-    plt.plot(T, 1e-6*model_elastic_modulus(T, *params),
-             'k', linewidth=1, linestyle='-',label="Exponential fit to E'")
-    plt.xlabel("Temperature ($^\circ$C)")
-    plt.ylabel("Modulus (MPa)")
-    ax = fig.gca()
-    ax.set_yscale('log')
-    plt.ylim([.001, 100])
-    plt.legend(loc="lower left")
-
-    modelstr = "LCE fit:\t modulus = exp({0:.6f}(T-{1:.2f})) + {2:.0f}".format(params[0], params[1], params[2])    
-    print(modelstr)
-    
-    if saveFlag:
-        plt.savefig(os.path.join(figdir, 'LCE_modulus.svg'), transparent=True)
-        plt.savefig(os.path.join(figdir, 'LCE_modulus.png'), dpi=200)
-
-    return params, model_elastic_modulus
-"""
 def fit_LCE_modulus_avg(sourcedir, saveFlag=False, figdir='', verboseFlag=False):
-    ''' Fit LCE storage and loss modulus data (from DMA) to an empirical model.
+    """ Fit LCE storage and loss modulus data (from DMA) to an empirical model.
         - Takes experimental data source directory
         - Smooths and interpolates E' and E'' data for each file in directory
         - Finds and plots mean and std for E' and E''
         - Finds best-fit parameters for exponential model for E''
-        - Returns the fitting parameters list and the model function '''
+        - Returns the fitting parameters list and the model function """
     
-    filelist = os.listdir(sourcedir)
+    filelist = [f for f in os.listdir(sourcedir) if os.path.isfile(os.path.join(sourcedir, f))]
+    print(f"len filelist: {len(filelist)}")
     T_min = 20
     T_max = 150
     interpEs = []
@@ -227,7 +153,6 @@ def fit_LCE_modulus_avg(sourcedir, saveFlag=False, figdir='', verboseFlag=False)
             ax.set_yscale('log')
             plt.ylim([.001, 100])
             plt.legend(loc="lower left")
-    
             
         # Add interpolation functions to list
         if len(T) != 1:
@@ -254,15 +179,18 @@ def fit_LCE_modulus_avg(sourcedir, saveFlag=False, figdir='', verboseFlag=False)
     El_avg = np.mean(El_vals, axis=1)
     El_std = np.std(El_vals, axis=1)
     
-    T_RT_avg = np.mean(T_RT)
-    T_RT_std = np.std(T_RT)
-    Es_RT_avg = np.mean(E_s_RT)
-    Es_RT_std = np.std(E_s_RT)
-    El_RT_avg = np.mean(E_l_RT)
-    El_RT_std = np.std(E_l_RT)
+    # Find mean and stdev of RT measurements, if any
+    if len(E_s_RT) > 0:
+        T_RT_avg = np.mean(T_RT)
+        T_RT_std = np.std(T_RT)
+        Es_RT_avg = np.mean(E_s_RT)
+        Es_RT_std = np.std(E_s_RT)
+        El_RT_avg = np.mean(E_l_RT)
+        El_RT_std = np.std(E_l_RT)
     
     # Fit to averaged data
     p_guess = [-0.07, 62, 0.7] # dy, T0, y0
+    print(len(Es_avg))
     params = opt.curve_fit(model_elastic_modulus, T_avg, Es_avg, p0=p_guess)[0]
 
     # Plot storage and loss modulus, with error band, as well as fit to E_s
@@ -271,14 +199,17 @@ def fit_LCE_modulus_avg(sourcedir, saveFlag=False, figdir='', verboseFlag=False)
     plt.fill_between(T_avg, 1e-6*(Es_avg-Es_std), 1e-6*(Es_avg+Es_std), color='r', alpha=0.2)
     plt.plot(T_avg, 1e-6*El_avg, 'b', label="E''")
     plt.fill_between(T_avg, 1e-6*(El_avg-El_std), 1e-6*(El_avg+El_std), color='b', alpha=0.2)
-    #for i in range(len(E_s_vals)):
-    #    E_val = E_s_vals[i]
-    #    T_val = T_vals[i]
-    #    plt.plot(T_val, 1e-6*E_val, '.r', label="E'", markersize=5)
     plt.plot(T_avg, 1e-6*model_elastic_modulus(T_avg, *params),
              'k', linewidth=1, linestyle='-',label="Exponential fit to E'")
-    #plt.errorbar(T_RT_avg, 1e-6*Es_RT_avg, xerr=T_RT_std, yerr=1e-6*Es_RT_std, capsize=4, fmt='.', color='r', label="E' (RT)")
-    #plt.errorbar(T_RT_avg, 1e-6*El_RT_avg, xerr=T_RT_std, yerr=1e-6*El_RT_std, capsize=4, fmt='.', color='b', label="E'' (RT)")
+    
+    # Plot RT measurements, if any, with error bars
+    if len(E_s_RT) > 0:
+        plt.errorbar(T_RT_avg, 1e-6*Es_RT_avg, xerr=T_RT_std, yerr=1e-6*Es_RT_std,
+                     capsize=4, fmt='.', color='r', label="E' (RT)")
+        plt.errorbar(T_RT_avg, 1e-6*El_RT_avg, xerr=T_RT_std, yerr=1e-6*El_RT_std,
+                     capsize=4, fmt='.', color='b', label="E'' (RT)")
+    
+    # Format
     plt.xlabel("Temperature ($^\circ$C)")
     plt.ylabel("Modulus (MPa)")
     ax = fig.gca()
@@ -292,6 +223,7 @@ def fit_LCE_modulus_avg(sourcedir, saveFlag=False, figdir='', verboseFlag=False)
         plt.savefig(os.path.join(figdir, 'LCE_modulus_avg.png'), dpi=200)
 
     return params, model_elastic_modulus
+
 
 def fit_LCE_tensile(sourcedir, verboseFlag=False, saveFlag=True, figdir=''):
     filelist = os.listdir(sourcedir)
@@ -333,12 +265,29 @@ def fit_LCE_tensile(sourcedir, verboseFlag=False, saveFlag=True, figdir=''):
     return
 
 
+def plot_DSC(filename, saveFlag=True, figdir=''):
+    """ Plot DSC data """
+    
+    mass = 8.1*1e-3 #[g]
+    data = np.genfromtxt(filename, skip_header=2)
+    T = data[:,0] #[degrees C]
+    heatFlow = 1e-3*data[:,1]/mass #[mW/mg] = [W/g]
+    
+    fig = plt.figure('LCE_DSC', dpi=200)
+    plt.plot(T, heatFlow)
+    plt.xlabel("Temperature ($^\circ$C)")
+    plt.ylabel("Heat Flow (W/g)")
+    
+    if saveFlag:
+        plt.savefig(os.path.join(figdir, 'LCD_DSC.svg'))
+        plt.savefig(os.path.join(figdir, 'LCE_DSC.png'), dpi=200)
+
 
 if __name__ == "__main__":   
     cwd = os.path.dirname(os.path.abspath(__file__))
     split = os.path.split(cwd)
     if split[1] == 'modules':
         cwd = split[0]
-    rawdir = os.path.join(cwd,"data/raw/LCE_properties")
-    tmpdir = os.path.join(cwd,"tmp")
+    rawdir = os.path.join(cwd, "data/raw/LCE_properties")
+    tmpdir = os.path.join(cwd, "tmp")
     
