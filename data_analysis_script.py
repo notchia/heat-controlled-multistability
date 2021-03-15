@@ -1,6 +1,6 @@
-# -*- coding: utf-8 -*-
 """
-Run all analyses required to generate results for ACS-AMI paper
+Run all analyses required to generate results for ACS-AMI paper,
+with the exception of the Paraview-generated 3D phase diagram visualization
 
 @author: Lucia Korpas
 """
@@ -8,11 +8,13 @@ Run all analyses required to generate results for ACS-AMI paper
 import numpy as np
 import os
 
-import modules.pltformat # No functions, just formatting
+import modules.pltformat # No functions, just formatting; don't delete
 import modules.LCEmodel as lce
 import modules.PDMSmodel as pdms
 import modules.magnetmodel as magnet
 import modules.bilayermodel as hinge
+import modules.curvatureanalysis as curvature
+import modules.angleanalysis as angle
 import modules.unitforceanalysis as force
 import modules.metamaterialmodel as unit
 
@@ -44,22 +46,27 @@ if __name__ == "__main__":
     #%% Get PDMS modulus 
     section_header('PDMS')
     sourcedir = os.path.join(rawdir, "PDMS_properties")
-    fname = "200820_PDMS_DMA.txt"
-    pdms.check_PDMS_temperature_independence(os.path.join(sourcedir, fname))
+    
+    fname_PDMS = "200820_PDMS_DMA.txt"
+    pdms.check_PDMS_temperature_independence(os.path.join(sourcedir, fname_PDMS))
     pdms.fit_PDMS_tensile(sourcedir, saveFlag=SAVE_FLAG, figdir=savedir)
     
-    #%% Get LCE modulus and contraction 
+    #%% Get LCE modulus and contraction and plot DSC data
     section_header('LCE')
     sourcedir = os.path.join(rawdir, "LCE_properties")
+    
     fname_strain = "ImageJ_measurements_31.5014mm2px.csv"
+    fname_DSC = "LCE_DSC.txt"
     strainParams, strainModel = lce.fit_LCE_strain(os.path.join(sourcedir, "LCE_contraction/"+fname_strain),
                                                    saveFlag=SAVE_FLAG, figdir=savedir)
     modulusParams, modulusModel = lce.fit_LCE_modulus_avg(os.path.join(sourcedir, "LCE_DMA"),
                                                           verboseFlag=VERBOSE_FLAG, saveFlag=SAVE_FLAG, figdir=savedir)
+    lce.plot_DSC(os.path.join(sourcedir, fname_DSC), saveFlag=SAVE_FLAG, figdir=savedir)
 
     #%% Get magnetic moment and check temperature degradation 
     section_header('magnet')
     sourcedir = os.path.join(rawdir, "magnet_properties")
+    
     moment = magnet.fit_magnet_forces(os.path.join(sourcedir, "moment"),
                                       zeroDisp=9.20,
                                       saveFlag=SAVE_FLAG, figdir=savedir)
@@ -67,26 +74,26 @@ if __name__ == "__main__":
         magnet.determine_temp_dependence(os.path.join(sourcedir, "temperature_degradation"),
                                          zeroDisp=7.85, saveFlag=SAVE_FLAG, figdir=savedir)    
     
-    #%% Run analysis on bilayer beams
+    #%% Run analysis on free bilayer beam curvature
     section_header('bilayer')
     sourcedir = os.path.join(rawdir, "bilayer_properties")
+    
     datafile = os.path.join(sourcedir, "200819_bilayer_ImageJ_curvature.csv")
     paramfile = os.path.join(sourcedir, "200819_bilayer_parameters.csv")
-    hinge.analyze_bending_data_200819(paramfile, datafile, LCE_modulus_params=modulusParams, 
-                              LCE_strain_params=strainParams, 
-                              saveFlag=SAVE_FLAG, figdir=savedir, verboseFlag=VERBOSE_FLAG)  
+    curvature.analyze_bending_data(paramfile, datafile, LCE_modulus_params=modulusParams, LCE_strain_params=strainParams, 
+                                   saveFlag=SAVE_FLAG, figdir=savedir, verboseFlag=VERBOSE_FLAG)  
     hinge.analyze_curvature_change_with_temp(LCE_modulus_params=modulusParams,
                                              LCE_strain_params=strainParams, 
                                              saveFlag=SAVE_FLAG, figdir=savedir, verboseFlag=VERBOSE_FLAG)
 
-    #%% Run analysis on bending angles
+    #%% Run analysis on unit cell bending angles, without 
     section_header('unit cell angles')
     sourcedir = os.path.join(rawdir, "unitCell_properties")
     
-    print("constant r:")
+    print("Using samples with nominally constant r values...")
     datafile = os.path.join(sourcedir, "rconst_angles_ImageJ.csv")
     paramfile = os.path.join(sourcedir, "rconst_parameters.csv")
-    b_fit = hinge.analyze_bending_angles(datafile, paramfile,
+    b_fit = angle.analyze_bending_angles(datafile, paramfile,
                            LCE_modulus_params=modulusParams,
                            LCE_strain_params=strainParams, titlestr='fixed r',
                            saveFlag=SAVE_FLAG, figdir=savedir)
@@ -102,71 +109,36 @@ if __name__ == "__main__":
     #%% Run analysis on r-const force-displacement data
     section_header('unit cell constant-r force')
     sourcedir = os.path.join(rawdir,"unitCell_properties/unitCell_tension_rconst")
-    r_avg, ucdf = force.import_rconst_data(sourcedir, bilayerDict, m=moment)
-    #r_avg, ucdf = force.import_rconst_data(sourcedir, setStartLoadToZero=True)#, bilayerDict)
+    r_avg, ucdf = force.import_rconst_data(sourcedir, bilayerDict, m=moment) #setStartLoadToZero=True
     
     #%% Find best-fit square stiffness for r-const data
     item_header("Finding best-fit k_sq")
-    #ksq_fit = force.analyze_rconst_nomagnets(ucdf, bilayerDict)
-    ksq_fit = force.analyze_rconst_ksq(ucdf, bilayerDict)
+    ksq_fit = force.analyze_rconst_ksq(ucdf, bilayerDict) #or, analyze_rconst_nomagnets
     print("k_sq_fit: {0}".format(ksq_fit))
-    #moment_fit = moment
 
     #%% Find best-fit magnetic moment and collision parameters for r-const data
     item_header("Finding best-fit moment and p_lim")
-    
-
-    
-    """
-    # This version also does not work
-    p_fit =  force.analyze_rconst_moment_and_collision_test(ucdf, ksq_fit, bilayerDict)
-    print("m_fit and p_lim_fit: {0}".format(p_fit))
-    moment_fit = p_fit[0]
-    p_lim_fit = p_fit[1:]
-    """
-    
-    """
-    # This version does not work
-    p_guess = [0.18,3e-10, 18]
-    weightMagnitude = 1.0# 0.5
-    moment_fit, p_lim_fit = force.analyze_rconst_moment_and_collision(ucdf, ksq_fit,
-                                                                      bilayerDict,
-                                                                      p_guess=p_guess,
-                                                                      limFlag=limFlag, 
-                                                                      weightMagnitude=weightMagnitude)
-    print("m_fit: {0}".format(moment_fit))
-    print("p_lim_fit: {0}".format(p_lim_fit))
-    """
-        
+               
     moment_fit = force.analyze_rconst_moment(ucdf, ksq_fit, bilayerDict)
     print("m_fit: {0}".format(moment_fit))
     #p_lim_fit = force.analyze_rconst_collision(ucdf, ksq_fit, moment_fit, bilayerDict)
     #print("p_lim_fit: {0}".format(p_lim_fit))
     
     #%% Plot resulting best-fit curves
-    # Commented out are the best-fit parameters found once upon a time...
-    limFlag='exp'
-    """
-    ksq_fit = 0.005765489237871801
-    moment_fit = 0.1897092016810536
-    p_lim_fit = [1.77252756e-10, 1.91067338e+01]
-    """    
-    
     item_header("Plotting resulting fit for r_const load-disp data")  
 
+    limFlag='exp'   
     p_lim_fit = [0,0]
     force.plot_final_rconst_fit(ucdf, ksq_fit, moment_fit, p_lim_fit, bilayerDict, limFlag=limFlag)
-
 
     #%% Run analysis on repeatability force-displacement data, using fits from r-const data
     section_header('unit cell force repeatability')
     sourcedir = os.path.join(rawdir,"unitCell_properties/unitCell_repeatability")
     force.analyze_repeatability_data(sourcedir, bilayerDict, k_sq=ksq_fit, m=moment_fit,
                                      saveFlag=SAVE_FLAG, figdir=savedir)
-
+    '''
     h_repeat = 1.71e-3
     r_repeat = 0.18
-    '''
     unit.analyze_h_T_relation(r_repeat, k_sq=ksq_fit, m=moment_fit, limFlag='exp', p_lim=[1e-14, 30],
                              bilayerDict=bilayerDict,
                              saveFlag=SAVE_FLAG, figdir=savedir)'''
@@ -182,10 +154,10 @@ if __name__ == "__main__":
                              figdir=savedir)
 
     # 2D phase diagram: dependence on diagonal
+    '''
     h_val = 1.2e-3
     ratio_val = 0.4
     thetaL_val = 0.0
-    '''
     unit.analyze_diagonal_dependence(h_val, ratio_val, thetaL_val,
                                 k_sq=ksq_fit, m=moment_fit, limFlag='exp', p_lim=p_lim_fit,#[1e-14, 30],
                                 bilayerDict=bilayerDict,
@@ -203,24 +175,23 @@ if __name__ == "__main__":
                               loadFlag=True, plotFlag=True,
                               **bilayerDict)
 
-    #%% Generate and plot 3D phase diagram 
+    #%% Generate and plot 3D phase diagrams
     section_header('phase diagrams')    
-    #h_range = 1e-3*np.arange(0.7,2.1,0.01) # 20201019
-    #thetaL_range = np.radians(np.arange(-15.0,15.1,0.1)) # 20201019
-    #T_range = np.arange(25.0,100.5,0.5) # 20201019
+
     h_range = 1e-3*np.arange(0.5,2.005,0.005)
     thetaL_range = np.radians(np.arange(-15.0,15.05,0.05))
-    T_range = np.arange(25.0,78.5,0.5) # CURRENTLY IN MANUSCRIPT
-    #T_range = np.arange(25.0,100.5,0.5)
+    #T_range = np.arange(25.0,78.5,0.5) # CURRENTLY IN MANUSCRIPT
+    T_range = np.array([25.0, 45.0, 78.0]) # New testing
     T_isotherm = [25.0, 45.0, 78.0] # CURRENTLY IN MANUSCRIPT
     i_isotherm = [np.argwhere(T_range == T_val)[0][0] for T_val in T_isotherm]
     
     r_range = np.arange(0.0,1.0,0.005)
-    T_isotherm = [25.0, 55.0, 75.0] # CURRENTLY IN MANUSCRIPT??
-     
+    #T_isotherm = [25.0, 55.0, 75.0] # CURRENTLY IN MANUSCRIPT??
+    
+    print("h-r-T analysis:")
     #datestr = '20201028'  # CURRENTLY IN MANUSCRIPT
-    datestr = 20201028
-    #datestr = 20201214
+    # datestr = '' # Use this to redo the analysis
+    datestr = '20210228' # New testing
     minimaMain, phasesMain, thetaTMain, theta0Main, paramDictMain, sampleModelMain = unit.run_main_parameter_phase_boundary_analysis(0.0,
                             h_range=h_range,
                             r_range=r_range,
@@ -234,10 +205,12 @@ if __name__ == "__main__":
                             minima=minimaMain, phases=phasesMain, angleT_vals=thetaTMain, angle0_vals=theta0Main)
 
     unit.save_boundaries(datestr, resdir, boundariesMain, boundaryDataMain, boundaryValsMain, tag='Main')
-    
     unit.save_isotherms(datestr, resdir, phasesMain, i_isotherm, h_range, r_range, T_range, tag='Main')    
     
-    datestr = '20201026' # CURRENTLY IN MANUSCRIPT
+    print("h-thetaL-T analysis:")
+    #datestr = '20201026' # CURRENTLY IN MANUSCRIPT
+    datestr = '' # Use this to redo the analysis
+    datestr = '20210228' # New testing
     minima, phases, thetaT, theta0, paramDict, sampleModel = unit.run_composite_phase_boundary_analysis(r_avg,
                             h_range=h_range,
                             thetaL_range=thetaL_range,
@@ -246,28 +219,17 @@ if __name__ == "__main__":
                             bilayerDict=bilayerDict,
                             savedir=resdir, closeFlag=False, datestr=datestr)
     
-    datestr = '20201027' # CURRENTLY IN MANUSCRIPT
+    #datestr = '20201027' # CURRENTLY IN MANUSCRIPT
+    datestr = '' # Use this to redo the analysis
+    datestr = '20210228' # New testing
     boundaries, boundaryVals, boundaryData = unit.find_3D_phase_boundaries(r_avg,
                             h_range=h_range, thetaL_range=thetaL_range, T_range=T_range,
                             minima=minima, phases=phases, angleT_vals=thetaT, angle0_vals=theta0)
     
     unit.save_boundaries(datestr, resdir, boundaries, boundaryData, boundaryVals)
-    
     unit.save_isotherms(datestr, resdir, phases, i_isotherm, h_range, thetaL_range, T_range)
     
     #%%
-    '''
     for T in T_range:
         unit.plot_isotherm(r_avg, T, phases, theta0, h_range=h_range, thetaL_range=thetaL_range,
                       T_range=T_range, savedir=resdir, closeFlag=True)   
-    '''
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
