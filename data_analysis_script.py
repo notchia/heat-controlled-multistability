@@ -17,6 +17,7 @@ import modules.curvatureanalysis as curvature
 import modules.angleanalysis as angle
 import modules.unitforceanalysis as force
 import modules.metamaterialmodel as unit
+import modules.repeatabilityanalysis as repeatability
 
 def section_header(section):
     print('\n**************************\n> Processing data on {0} properties...'.format(section))
@@ -97,8 +98,7 @@ if __name__ == "__main__":
                            LCE_modulus_params=modulusParams,
                            LCE_strain_params=strainParams, titlestr='fixed r',
                            saveFlag=SAVE_FLAG, figdir=savedir)
-    print("b_fit: {0}".format(b_fit))
-
+    print("arc length is now defined as s = b_fit[0]h^2, with b_fit = {0}".format(b_fit))
 
     #%% Define dictionary to easily pass the fitting parameters through the rest of the modeling
     bilayerDict = {"LCE_modulus_params":modulusParams,
@@ -109,10 +109,12 @@ if __name__ == "__main__":
     #%% Run analysis on r-const force-displacement data
     section_header('unit cell constant-r force')
     sourcedir = os.path.join(rawdir,"unitCell_properties/unitCell_tension_rconst")
+    
     r_avg, ucdf = force.import_rconst_data(sourcedir, bilayerDict, m=moment) #setStartLoadToZero=True
     
     #%% Find best-fit square stiffness for r-const data
     item_header("Finding best-fit k_sq")
+    
     ksq_fit = force.analyze_rconst_ksq(ucdf, bilayerDict) #or, analyze_rconst_nomagnets
     print("k_sq_fit: {0}".format(ksq_fit))
 
@@ -134,7 +136,7 @@ if __name__ == "__main__":
     #%% Run analysis on repeatability force-displacement data, using fits from r-const data
     section_header('unit cell force repeatability')
     sourcedir = os.path.join(rawdir,"unitCell_properties/unitCell_repeatability")
-    force.analyze_repeatability_data(sourcedir, bilayerDict, k_sq=ksq_fit, m=moment_fit,
+    repeatability.analyze_repeatability_data(sourcedir, bilayerDict, k_sq=ksq_fit, m=moment_fit,
                                      saveFlag=SAVE_FLAG, figdir=savedir)
     '''
     h_repeat = 1.71e-3

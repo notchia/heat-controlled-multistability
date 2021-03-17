@@ -1,12 +1,9 @@
-# -*- coding: utf-8 -*-
 """
-Created on Mon Aug 31 11:21:31 2020
-
-@author: Lucia
-
 UnitCellData class and associated functions for manipulating quasistatic unit 
 cell data, as collected using the AML's material tester, for one-shot loading
 in tension.
+
+@author: Lucia Korpas
 """
 
 import numpy as np
@@ -23,10 +20,10 @@ from modules import unitforcemodel as model
 
 
 class UnitCellData:
-    ''' Store and manipulate data for each materials-tester data file imported'''
+    """ Store and manipulate data for each materials-tester data file imported"""
     def __init__(self, csvpath, cropFlag=True, figFlag=False, initEmpty=False,
                  setStartLoadToZero=False, setZeroLoadFromAngle=False, m=0):
-        ''' Set metadata based on filename and import load-displacement data  '''
+        """ Set metadata based on filename and import load-displacement data  """
 
         # Set parameter information -------------------------------------------
         csvname = os.path.splitext(os.path.split(csvpath)[-1])[0]
@@ -72,7 +69,7 @@ class UnitCellData:
         # and load mean and standard deviation
 
     def get_Series(self):
-        ''' Create a pandas Series to be compiled into the DataFrame for all of the data '''
+        """ Create a pandas Series for one sample test """
         return pd.Series({"data":    self,
                           "fileid":  self.fileid,
                           "h":       self.h,
@@ -83,9 +80,10 @@ class UnitCellData:
                           "magnets": self.magnets})
 
     def set_zero_with_angle(self, bilayerDict):
+        """ Rezero the  """
         hinge = bilayer.BilayerModel(self.h, self.r, T=self.T, **bilayerDict)
         nominalZero = model.rot2disp(hinge.thetaT, self.d/2)
-        zeroIndex = np.where(self.disp < nominalZero)[0][0] # CHECK THIS
+        zeroIndex = np.where(self.disp < nominalZero)[0][0] # TODO: CHECK THIS
         self.zeroOffset = self.load[zeroIndex]
         self.load = self.load - self.zeroOffset
         if self.cropFlag:
@@ -96,11 +94,11 @@ class UnitCellData:
 
     def _import_data(self, filepath, speed=0.2, zeroDisp=0.0, sampleLoad=0.0,
                      figFlag=False): 
-        ''' Import one-shot test in tension. 
+        """ Import one-shot test in tension. 
             - speed:          [mm/s] test speed
             - zeroDisp:       [mm] initial distance between centers of squares
             - sampleLoad:     [N] sample mass
-            - tempLoadOffset: [N] load offset due to shift in load zero as a result of temperature'''
+            - tempLoadOffset: [N] load offset due to shift in load zero as a result of temperature"""
        
         # Import test ---------------------------------------------------------
         cols = [0,1] #time, load
@@ -148,10 +146,10 @@ class UnitCellData:
         return self.disp[self.zeroIndex:], self.load[self.zeroIndex:]
     
     def _get_re_value(self, strname, pattern, defaultval):
-        ''' Ternary operator for assigning values using regular expressions.
+        """ Ternary operator for assigning values using regular expressions.
             - Returns numbers as floats
             - Returns Y/N as 0/1
-            - Otherwise, returns string'''
+            - Otherwise, returns string"""
         patternmatch = re.search(pattern,strname)
         if patternmatch:
             returnval = patternmatch.group(1)
@@ -169,7 +167,7 @@ class UnitCellData:
             return defaultval    
     
     def _get_temperature_group(self):
-        ''' 0, 1, 2 for room temperature, medium (~45C), and high (~75C) '''
+        """ 0, 1, 2 for room temperature, medium (~45C), and high (~75C) """
         if self.T < 30:
             group = 0
         elif self.T < 60:
@@ -182,7 +180,7 @@ class UnitCellData:
 #%% Utilities for importing and analyzing multiple datasets
 def import_all_unit_cells(sourcedir, cropFlag=True, figFlag=False, setStartLoadToZero=False,
                           bilayerDict={}, m=0):
-    ''' Import all unit cell data from a directory into a DataFrame '''
+    """ Import all unit cell data from a directory into a DataFrame """
     
     UCDF = pd.DataFrame()  
     count = 0
@@ -224,10 +222,11 @@ def import_all_unit_cells(sourcedir, cropFlag=True, figFlag=False, setStartLoadT
     
     return UCDF
 
+
 def compute_unitCell_mean_std(ucdf, nPoints=2500):
-    ''' Given dataframe containing only the data to be averaged, return
+    """ Given dataframe containing only the data to be averaged, return
         UnitCellData object corresponding to mean and standard deviation
-        '''
+        """
     
     nTests = len(ucdf.index)
     load_all = np.zeros((nPoints, nTests))
@@ -283,8 +282,9 @@ def compute_unitCell_mean_std(ucdf, nPoints=2500):
     
     return meanUnit
 
-def plot_magnet_and_T_comparison(ucdf, stdFlag=False, legendOut=False):
-    ''' Plot and compare data, grouping by magnets and temperature '''
+
+def plot_magnet_and_T_comparison(ucdf, modellist=None, stdFlag=False, legendOut=False):
+    """ Plot and compare data, grouping by magnets and temperature """
     
     plt.figure(dpi=200)
     plt.xlabel("Strain, $\delta/d$")
@@ -293,50 +293,25 @@ def plot_magnet_and_T_comparison(ucdf, stdFlag=False, legendOut=False):
     styles = ['-','--']
     TLabels = ['RT', 'T~45$^\circ$', 'T~75$^\circ$']
     magnetLabels = ['no', 'with']
+    
     for index, row in ucdf.iterrows():
         unit = row["data"]
         T_index = int(unit.T_group)
         m_index = int(unit.magnets)
-        disp_plt = unit.strain#((unit.d - unit.disp)/unit.d)
+        disp_plt = unit.strain
         plt.plot(disp_plt, unit.load, color=colors[T_index], linestyle=styles[m_index],
                  label='{0}, {1} magnets'.format(TLabels[T_index], magnetLabels[m_index]))
         if stdFlag:
             plt.fill_between(disp_plt, unit.load-unit.std, unit.load+unit.std, color=colors[T_index], alpha=0.2)
+        if modellist:
+            plt.plot(disp_plt[:-550], modellist[index][:-550], '--', color=colors[T_index], label="model")
+    
     if legendOut:
         plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     else:
         plt.legend()
     
     return
-
-
-def plot_no_magnet_model_T_comparison(ucdf, modellist, stdFlag=False, legendOut=False):
-    ''' Plot and compare data, grouping by magnets and temperature for final fig. 4'''
-    
-    plt.figure(dpi=200)
-    plt.xlabel("Strain, $\delta/d$")
-    plt.ylabel("Load (N)")
-    colors = ['r','g','b']
-    styles = ['-','--']
-    TLabels = ['RT', 'T~45$^\circ$', 'T~75$^\circ$']
-    magnetLabels = ['no', 'with']
-    for index, row in ucdf.iterrows():
-        unit = row["data"]
-        T_index = int(unit.T_group)
-        m_index = int(unit.magnets)
-        disp_plt = unit.strain#
-        plt.plot(disp_plt, unit.load, color=colors[T_index], linestyle=styles[m_index],
-                 label='{0}, {1} magnets'.format(TLabels[T_index], magnetLabels[m_index]))
-        if stdFlag:
-            plt.fill_between(disp_plt, unit.load-unit.std, unit.load+unit.std, color=colors[T_index], alpha=0.2)
-        plt.plot(disp_plt[:-550], modellist[index][:-550], '--', color=colors[T_index], label="model")
-    if legendOut:
-        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-    else:
-        plt.legend()
-    
-    return
-
 
     
 #%% Main importing function
