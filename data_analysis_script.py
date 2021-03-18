@@ -18,6 +18,7 @@ import modules.angleanalysis as angle
 import modules.unitforceanalysis as force
 import modules.metamaterialmodel as unit
 import modules.repeatabilityanalysis as repeatability
+import modules.parameterspaceanalysis as mapping
 
 def section_header(section):
     print('\n**************************\n> Processing data on {0} properties...'.format(section))
@@ -139,11 +140,22 @@ if __name__ == "__main__":
     repeatability.analyze_repeatability_data(sourcedir, bilayerDict, k_sq=ksq_fit, m=moment_fit,
                                      saveFlag=SAVE_FLAG, figdir=savedir)
     '''
+    # Generate 2D phase diagram: h-T relationship for repeatability parameters
     h_repeat = 1.71e-3
     r_repeat = 0.18
-    unit.analyze_h_T_relation(r_repeat, k_sq=ksq_fit, m=moment_fit, limFlag='exp', p_lim=[1e-14, 30],
+    mapping.analyze_h_T_relation(r_repeat, k_sq=ksq_fit, m=moment_fit, limFlag='exp', p_lim=[1e-14, 30],
                              bilayerDict=bilayerDict,
-                             saveFlag=SAVE_FLAG, figdir=savedir)'''
+                             saveFlag=SAVE_FLAG, figdir=savedir)
+    
+    # Generate 2D phase diagram: dependence on diagonal
+    h_val = 1.2e-3
+    ratio_val = 0.4
+    thetaL_val = 0.0
+    mapping.analyze_diagonal_dependence(h_val, ratio_val, thetaL_val,
+                                k_sq=ksq_fit, m=moment_fit, limFlag='exp', p_lim=p_lim_fit,#[1e-14, 30],
+                                bilayerDict=bilayerDict,
+                                saveFlag=SAVE_FLAG, figdir=savedir)
+    '''
         
     #%% Generate additional manuscript figures: energy plots and 2D phase diagrams
     # Plot comparing change in total and spring energy with temperature (for Fig. 1)
@@ -154,17 +166,6 @@ if __name__ == "__main__":
                              k_sq=ksq_fit, m=moment_fit, #p_lim=p_lim_fit,
                              bilayerDict=bilayerDict,
                              figdir=savedir)
-
-    # 2D phase diagram: dependence on diagonal
-    '''
-    h_val = 1.2e-3
-    ratio_val = 0.4
-    thetaL_val = 0.0
-    unit.analyze_diagonal_dependence(h_val, ratio_val, thetaL_val,
-                                k_sq=ksq_fit, m=moment_fit, limFlag='exp', p_lim=p_lim_fit,#[1e-14, 30],
-                                bilayerDict=bilayerDict,
-                                saveFlag=SAVE_FLAG, figdir=savedir)'''
-
 
     #%% Plot energy landscapes for specific cases
     ANGLE_NEAR_ZERO = 1e-8 # Since setting angle to exactly zero can give numerical trouble
@@ -178,7 +179,7 @@ if __name__ == "__main__":
                               **bilayerDict)
 
     #%% Generate and plot 3D phase diagrams
-    section_header('phase diagrams')    
+    section_header('phase diagram model')    
 
     h_range = 1e-3*np.arange(0.5,2.005,0.005)
     thetaL_range = np.radians(np.arange(-15.0,15.05,0.05))
@@ -188,13 +189,11 @@ if __name__ == "__main__":
     i_isotherm = [np.argwhere(T_range == T_val)[0][0] for T_val in T_isotherm]
     
     r_range = np.arange(0.0,1.0,0.005)
-    #T_isotherm = [25.0, 55.0, 75.0] # CURRENTLY IN MANUSCRIPT??
     
-    print("h-r-T analysis:")
-    #datestr = '20201028'  # CURRENTLY IN MANUSCRIPT
+    item_header("h-r-T parameter space analysis")
     # datestr = '' # Use this to redo the analysis
     datestr = '20210228' # New testing
-    minimaMain, phasesMain, thetaTMain, theta0Main, paramDictMain, sampleModelMain = unit.run_main_parameter_phase_boundary_analysis(0.0,
+    minimaMain, phasesMain, thetaTMain, theta0Main, paramDictMain, sampleModelMain = mapping.run_main_parameter_phase_boundary_analysis(0.0,
                             h_range=h_range,
                             r_range=r_range,
                             T_range=T_range,
@@ -202,18 +201,17 @@ if __name__ == "__main__":
                             bilayerDict=bilayerDict,
                             savedir=resdir, closeFlag=False, datestr=datestr)
 
-    boundariesMain, boundaryValsMain, boundaryDataMain = unit.find_3D_phase_boundaries_main_params(0.0,
+    boundariesMain, boundaryValsMain, boundaryDataMain = mapping.find_3D_phase_boundaries_main_params(0.0,
                             h_range=h_range, r_range=r_range, T_range=T_range,
                             minima=minimaMain, phases=phasesMain, angleT_vals=thetaTMain, angle0_vals=theta0Main)
 
-    unit.save_boundaries(datestr, resdir, boundariesMain, boundaryDataMain, boundaryValsMain, tag='Main')
-    unit.save_isotherms(datestr, resdir, phasesMain, i_isotherm, h_range, r_range, T_range, tag='Main')    
+    mapping.save_boundaries(datestr, resdir, boundariesMain, boundaryDataMain, boundaryValsMain, tag='Main')
+    mapping.save_isotherms(datestr, resdir, phasesMain, i_isotherm, h_range, r_range, T_range, tag='Main')    
     
-    print("h-thetaL-T analysis:")
-    #datestr = '20201026' # CURRENTLY IN MANUSCRIPT
+    item_header("h-thetaL-T parameter space analysis")
     datestr = '' # Use this to redo the analysis
     datestr = '20210228' # New testing
-    minima, phases, thetaT, theta0, paramDict, sampleModel = unit.run_composite_phase_boundary_analysis(r_avg,
+    minima, phases, thetaT, theta0, paramDict, sampleModel = mapping.run_composite_phase_boundary_analysis(r_avg,
                             h_range=h_range,
                             thetaL_range=thetaL_range,
                             T_range=T_range,
@@ -221,17 +219,16 @@ if __name__ == "__main__":
                             bilayerDict=bilayerDict,
                             savedir=resdir, closeFlag=False, datestr=datestr)
     
-    #datestr = '20201027' # CURRENTLY IN MANUSCRIPT
     datestr = '' # Use this to redo the analysis
     datestr = '20210228' # New testing
-    boundaries, boundaryVals, boundaryData = unit.find_3D_phase_boundaries(r_avg,
+    boundaries, boundaryVals, boundaryData = mapping.find_3D_phase_boundaries(r_avg,
                             h_range=h_range, thetaL_range=thetaL_range, T_range=T_range,
                             minima=minima, phases=phases, angleT_vals=thetaT, angle0_vals=theta0)
     
-    unit.save_boundaries(datestr, resdir, boundaries, boundaryData, boundaryVals)
-    unit.save_isotherms(datestr, resdir, phases, i_isotherm, h_range, thetaL_range, T_range)
+    mapping.save_boundaries(datestr, resdir, boundaries, boundaryData, boundaryVals)
+    mapping.save_isotherms(datestr, resdir, phases, i_isotherm, h_range, thetaL_range, T_range)
     
     #%%
     for T in T_range:
-        unit.plot_isotherm(r_avg, T, phases, theta0, h_range=h_range, thetaL_range=thetaL_range,
+        mapping.plot_isotherm(r_avg, T, phases, theta0, h_range=h_range, thetaL_range=thetaL_range,
                       T_range=T_range, savedir=resdir, closeFlag=True)   

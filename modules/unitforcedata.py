@@ -1,7 +1,7 @@
 """
-UnitCellData class and associated functions for manipulating quasistatic unit 
-cell data, as collected using the AML's material tester, for one-shot loading
-in tension.
+Define UnitCellData class and associated functions for manipulating quasistatic 
+unit cell data, as collected using the AML's material tester, for one-shot 
+loading in tension.
 
 @author: Lucia Korpas
 """
@@ -80,7 +80,8 @@ class UnitCellData:
                           "magnets": self.magnets})
 
     def set_zero_with_angle(self, bilayerDict):
-        """ Rezero the  """
+        """ Rezero the force-displacement curves based on the nominal
+            right-angle position """
         hinge = bilayer.BilayerModel(self.h, self.r, T=self.T, **bilayerDict)
         nominalZero = model.rot2disp(hinge.thetaT, self.d/2)
         zeroIndex = np.where(self.disp < nominalZero)[0][0] # TODO: CHECK THIS
@@ -142,6 +143,8 @@ class UnitCellData:
         return disp, load
  
     def _crop_to_compressed(self):
+        """ Crop out the portion where the angle-displacement relation breaks
+            down """
         self.zeroIndex = np.argwhere(self.disp <= self.d)[0][0]
         return self.disp[self.zeroIndex:], self.load[self.zeroIndex:]
     
@@ -192,12 +195,12 @@ def import_all_unit_cells(sourcedir, cropFlag=True, figFlag=False, setStartLoadT
             filepath = os.path.join(sourcedir, entry)
             ucd = UnitCellData(filepath, cropFlag=cropFlag, figFlag=figFlag,
                                setStartLoadToZero=setStartLoadToZero, m=m)
-            if any(bilayerDict) and (ucd.magnets == 0): # update based on modeled angle!
+            if any(bilayerDict) and (ucd.magnets == 0): # TODO: update based on modeled angle!
                 ucd.set_zero_with_angle(bilayerDict)
             UCDF = UCDF.append(ucd.get_Series(),ignore_index=True)
         count += 1
 
-    # Update the load zero offset based on the modeled angle.
+    # Update the load zero offset based on the modeled angle
     if any(bilayerDict):
         ucdf_Y = UCDF.loc[UCDF["magnets"] == 1]
         for index, row in ucdf_Y.iterrows():
