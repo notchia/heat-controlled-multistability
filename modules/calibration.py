@@ -1,8 +1,10 @@
-# -*- coding: utf-8 -*-
 """
-Created on Wed Sep  2 15:13:34 2020
+Despite efforts to separate the load cell from the heated chamber,
+heat transfer through the threaded rod still results in significant drift in
+the load zero as the cell heats up. This function is an attempt to characterize
+and account for this.
 
-@author: Lucia
+@author: Lucia Korpas
 """
 
 import numpy as np
@@ -10,6 +12,10 @@ import matplotlib.pyplot as plt
 import os
 
 def find_temp2load_offset(sourcedir):
+    """ Find the linear fit which best describes the load offset resulting from 
+    an increase in temperature. Test conditions were as similar to the real
+    setup as possible: threaded rod lowered into box, heating with heat gun """
+    
     filenames = os.listdir(sourcedir)
     T = []
     L = []
@@ -80,6 +86,6 @@ if __name__ == "__main__":
     rawdir = os.path.join(cwd,"data/raw")
     tmpdir = os.path.join(cwd,"tmp")
 
-    sourcedir = os.path.join(rawdir,'200831_temperature_calibration')
+    sourcedir = os.path.join(rawdir,'preprocessing/200831_temperature_calibration')
     find_temp2load_offset(sourcedir)
     
