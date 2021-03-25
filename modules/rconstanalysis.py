@@ -13,7 +13,7 @@ import scipy.signal as signal
 
 from modules import unitforcedata as experiment
 from modules import unitforcemodel as model
-from modules import metamaterialmodel as metamat
+from modules import metamaterialmodel as m3
 
 ANGLE_NEAR_ZERO = 1e-8 # Since setting angle to exactly zero can give numerical trouble
 
@@ -46,7 +46,7 @@ def analyze_rconst_ksq(ucdf, bilayerDict):
     count = 0
     for index, row in ucdf_Y.iterrows():
         unitData = row["data"]
-        unitModel = metamat.MetamaterialModel(unitData.h, unitData.r, ANGLE_NEAR_ZERO,
+        unitModel = m3.MetamaterialModel(unitData.h, unitData.r, ANGLE_NEAR_ZERO,
                                               T=unitData.T, d=unitData.d,
                                               hasMagnets=bool(unitData.magnets), m=unitData.m,
                                               **bilayerDict)
@@ -85,7 +85,7 @@ def analyze_rconst_moment(ucdf, k_sq_fit, bilayerDict):
     count = 0
     for index, row in ucdf_Y.iterrows():
         unitData = row["data"]
-        unitModel = metamat.MetamaterialModel(unitData.h, unitData.r, ANGLE_NEAR_ZERO,
+        unitModel = m3.MetamaterialModel(unitData.h, unitData.r, ANGLE_NEAR_ZERO,
                                               T=unitData.T, d=unitData.d,
                                               k_sq=k_sq_fit,
                                               hasMagnets=0, p_lim=[0,0],
@@ -129,7 +129,7 @@ def plot_final_rconst_fit(ucdf, k_sq_fit, m_fit, p_lim_fit, bilayerDict, limFlag
         # Plot experiment and model curves
         disp_plt = unitData.strain        
         plt.plot(disp_plt, unitData.load, 'k', label="experiment")
-        unitModel = metamat.MetamaterialModel(unitData.h, unitData.r, ANGLE_NEAR_ZERO,
+        unitModel = m3.MetamaterialModel(unitData.h, unitData.r, ANGLE_NEAR_ZERO,
                                               T=unitData.T, d=unitData.d,
                                               k_sq=k_sq_fit, m=m_fit, p_lim=p_lim_fit,
                                               limFlag=limFlag,
@@ -174,7 +174,7 @@ def residual_constant_ksq(p, ksq_fit_individual, ucdf, p_lim=[0,0], limFlag='exp
     count = 0
     for index, row in ucdf.iterrows():
         unitData = row["data"]
-        unitModel = metamat.MetamaterialModel(unitData.h, unitData.r, ANGLE_NEAR_ZERO,
+        unitModel = m3.MetamaterialModel(unitData.h, unitData.r, ANGLE_NEAR_ZERO,
                                               T=unitData.T, d=unitData.d, s=unitData.s, 
                                               k_sq=k_sq, p_lim=p_lim, m=unitData.m,
                                               hasMagnets=bool(unitData.magnets))
@@ -266,7 +266,7 @@ def residual_constant_collision(p, ucdf, params_given, limFlag='exp'):
     count = 0
     for index, row in ucdf.iterrows():
         unitData = row["data"]
-        unitModel = metamat.MetamaterialModel(unitData.h, unitData.r, ANGLE_NEAR_ZERO,
+        unitModel = m3.MetamaterialModel(unitData.h, unitData.r, ANGLE_NEAR_ZERO,
                                               T=unitData.T, d=unitData.d, 
                                               k_sq=k_sq_fit, p_lim=p, limFlag=limFlag,
                                               m = m_fit,

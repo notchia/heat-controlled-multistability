@@ -15,7 +15,7 @@ import modules.magnetmodel as magnet
 import modules.bilayermodel as hinge
 import modules.curvatureanalysis as curvature
 import modules.angleanalysis as angle
-import modules.unitforceanalysis as force
+import modules.rconstanalysis as force
 import modules.metamaterialmodel as unit
 import modules.repeatabilityanalysis as repeatability
 import modules.parameterspaceanalysis as mapping
