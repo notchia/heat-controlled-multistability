@@ -134,6 +134,11 @@ if __name__ == "__main__":
     #print("p_lim_fit: {0}".format(p_lim_fit))
     #ucdf_update = force.update_data_with_d(ucdf, d_fit)
     
+    #%% Find best-fit square stiffness and magnetic moment
+    #p_fit = force.analyze_rconst_ksq_and_m(ucdf, bilayerDict)
+    #print("ksq_fit and m_fit: {0}".format(p_fit))
+    #ksq_fit, moment_fit = p_fit
+    
     #%% Plot resulting best-fit curves
     item_header("Plotting resulting fit for r_const load-disp data")  
 
@@ -236,4 +241,4 @@ if __name__ == "__main__":
     #%%
     for T in T_range:
         mapping.plot_isotherm(r_avg, T, phases, theta0, h_range=h_range, thetaL_range=thetaL_range,
-                      T_range=T_range, savedir=resdir, closeFlag=True)   
+                      T_range=T_range, savedir=resdir, closeFlag=False)   

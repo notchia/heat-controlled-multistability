@@ -195,6 +195,33 @@ def force_displacement_ksq_L(x, p, q0, k_hinge, moment):
     return F
 
 
+
+def approximate_ksq_m(disp, force, p_guess, p_given, figFlag=False):
+    """ Given some known parameters p_given, determine magnetic moment """
+    
+    q0, k_hinge, L = p_given
+    p_fit = opt.least_squares(residual_force_displacement_ksq_m, p_guess,
+                              args=(force, disp, q0, k_hinge, L))
+    p_fit = p_fit.x
+
+    return p_fit
+
+def residual_force_displacement_ksq_m(p, y, x, q0, k_hinge, L):
+    return (y - force_displacement_ksq_L(x, p, q0, k_hinge, L))
+
+def force_displacement_ksq_m(x, p, q0, k_hinge, L):
+    """ Defines force(disp) function including magnets, with k_sq and L as
+    fitting parameters and k_hinge, moment as known. Assume no collision! """
+    k_squares, m = p
+    kq = equivalent_springs_in_series(k_hinge, k_squares)
+    q = disp2rot(x, L)
+    M_k = torque_k(q, kq, q0)
+    M_m = torque_magnet(q, moment, L)
+    #M_lim = torque_lim(q, p1, p2, flag=flag)
+    M = 4*M_k + 4*M_m# + 4*M_lim
+    F = M/(2*L*np.cos(q))
+    return F
+
 # =============================================================================
 # Repeatability analysis 
 # =============================================================================
