@@ -48,7 +48,7 @@ class UnitCellData:
             sampleLoad = self._get_re_value(csvname,'_(\d*\.\d+)N',0.0)           # [N] sample mass
             self.disp, self.load  = self._import_data(csvpath, speed=speed, zeroDisp=zeroDisp,
                                                       sampleLoad=sampleLoad, figFlag=figFlag)
-        
+
             # Crop to analyzable portion of data (compression)
             if cropFlag:
                 self.disp_full, self.load_full = self.disp, self.load
@@ -92,6 +92,18 @@ class UnitCellData:
         else:
             self.load_crop = self.load_crop - self.zeroOffset
         return
+    
+    def reset_d(self, d):
+        self.d = d
+        if self.cropFlag:
+            #self.disp_full, self.load_full = self.disp_orig, self.load
+            self.strain_full = (self.d - self.disp_full)/self.d
+            self.disp, self.load = self._crop_to_compressed()
+            self.strain = (self.d - self.disp)/self.d
+        else:
+            self.strain = (self.d - self.disp)/self.d
+            self.disp_crop, self.load_crop = self._crop_to_compressed()
+            self.strain_crop = (self.d - self.crop)/self.d        
 
     def _import_data(self, filepath, speed=0.2, zeroDisp=0.0, sampleLoad=0.0,
                      figFlag=False): 

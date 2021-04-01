@@ -257,7 +257,7 @@ class MetamaterialModel:
         
         plt.savefig('h{0:.2f}_r{1:.2f}_L{2:0.1f}_T{3:.1f}.png'.format(
             self.h_total, self.ratio, np.degrees(self.thetaL), int(self.T)))
-        plt.close()
+        #plt.close()
         
         return
     

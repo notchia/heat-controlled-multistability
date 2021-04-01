@@ -124,21 +124,30 @@ if __name__ == "__main__":
                
     moment_fit = force.analyze_rconst_moment(ucdf, ksq_fit, bilayerDict)
     print("m_fit: {0}".format(moment_fit))
-    #p_lim_fit = force.analyze_rconst_collision(ucdf, ksq_fit, moment_fit, bilayerDict)
+    #moment_fit = moment
+    
+    #p_fit = force.analyze_rconst_ksq_and_d(ucdf, moment_fit, bilayerDict)
+    #ksq_fit, L_fit = p_fit
+    #d_fit = 2*L_fit
+    #print("ksq_fit and L_fit: {0}".format(p_fit))
+    #p_lim_fit = force.analyze_rconst_collision(ucdf, ksq_fit, 0, bilayerDict)
     #print("p_lim_fit: {0}".format(p_lim_fit))
+    #ucdf_update = force.update_data_with_d(ucdf, d_fit)
     
     #%% Plot resulting best-fit curves
     item_header("Plotting resulting fit for r_const load-disp data")  
 
     limFlag='exp'   
-    p_lim_fit = [0,0]
-    force.plot_final_rconst_fit(ucdf, ksq_fit, moment_fit, p_lim_fit, bilayerDict, limFlag=limFlag)
+    p_lim_fit = [1e-14, 30]#[3e-22, 51] # Chosen completely by hand
+    force.plot_final_rconst_fit(ucdf, ksq_fit, moment_fit, p_lim_fit, bilayerDict,
+                                limFlag=limFlag)
 
     #%% Run analysis on repeatability force-displacement data, using fits from r-const data
     section_header('unit cell force repeatability')
     sourcedir = os.path.join(rawdir,"unitCell_properties/unitCell_repeatability")
-    repeatability.analyze_repeatability_data(sourcedir, bilayerDict, k_sq=ksq_fit, m=moment_fit,
-                                     saveFlag=SAVE_FLAG, figdir=savedir)
+    repeatability.analyze_repeatability_data(sourcedir, bilayerDict,
+                                             k_sq=ksq_fit, m=moment_fit, p_lim=p_lim_fit,
+                                             saveFlag=SAVE_FLAG, figdir=savedir)
     '''
     # Generate 2D phase diagram: h-T relationship for repeatability parameters
     h_repeat = 1.71e-3
@@ -163,26 +172,26 @@ if __name__ == "__main__":
     r_val = 0.25
     T_range = [25.0, 35.0, 50.0, 80.0]
     unit.plot_energy_concept(h_val, r_val, 0.0, T_range,
-                             k_sq=ksq_fit, m=moment_fit, #p_lim=p_lim_fit,
+                             k_sq=ksq_fit, m=moment_fit, p_lim=p_lim_fit,
                              bilayerDict=bilayerDict,
                              figdir=savedir)
 
     #%% Plot energy landscapes for specific cases
     ANGLE_NEAR_ZERO = 1e-8 # Since setting angle to exactly zero can give numerical trouble
     unit.MetamaterialModel(0.73e-3, 0.47, ANGLE_NEAR_ZERO, T=25.0,
-                              k_sq=ksq_fit,
+                              k_sq=ksq_fit, m=moment_fit, p_lim=p_lim_fit,
                               loadFlag=True, plotFlag=True,
                               **bilayerDict)
     unit.MetamaterialModel(1.50e-3, 0.40, ANGLE_NEAR_ZERO, T=25.0,
-                              k_sq=ksq_fit,
+                              k_sq=ksq_fit, m=moment_fit, p_lim=p_lim_fit,
                               loadFlag=True, plotFlag=True,
                               **bilayerDict)
 
     #%% Generate and plot 3D phase diagrams
     section_header('phase diagram model')    
 
-    h_range = 1e-3*np.arange(0.5,2.005,0.005)
-    thetaL_range = np.radians(np.arange(-15.0,15.05,0.05))
+    h_range = 1e-3*np.arange(0.5,2.005,0.01)
+    thetaL_range = np.radians(np.arange(-15.0,15.05,0.1))
     #T_range = np.arange(25.0,78.5,0.5) # CURRENTLY IN MANUSCRIPT
     T_range = np.array([25.0, 45.0, 78.0]) # New testing
     T_isotherm = [25.0, 45.0, 78.0] # CURRENTLY IN MANUSCRIPT
@@ -191,12 +200,10 @@ if __name__ == "__main__":
     r_range = np.arange(0.0,1.0,0.005)
     
     item_header("h-r-T parameter space analysis")
-    # datestr = '' # Use this to redo the analysis
-    datestr = '20210228' # New testing
+    datestr = '' # Use this to redo the analysis
+    #datestr = '20210228' # New testing
     minimaMain, phasesMain, thetaTMain, theta0Main, paramDictMain, sampleModelMain = mapping.run_main_parameter_phase_boundary_analysis(0.0,
-                            h_range=h_range,
-                            r_range=r_range,
-                            T_range=T_range,
+                            h_range=h_range, r_range=r_range, T_range=T_range,
                             k_sq=ksq_fit, m=moment_fit, p_lim=p_lim_fit,
                             bilayerDict=bilayerDict,
                             savedir=resdir, closeFlag=False, datestr=datestr)
@@ -210,17 +217,15 @@ if __name__ == "__main__":
     
     item_header("h-thetaL-T parameter space analysis")
     datestr = '' # Use this to redo the analysis
-    datestr = '20210228' # New testing
+    #datestr = '20210228' # New testing
     minima, phases, thetaT, theta0, paramDict, sampleModel = mapping.run_composite_phase_boundary_analysis(r_avg,
-                            h_range=h_range,
-                            thetaL_range=thetaL_range,
-                            T_range=T_range,
+                            h_range=h_range, thetaL_range=thetaL_range, T_range=T_range,
                             k_sq=ksq_fit, m=moment_fit, p_lim=p_lim_fit,
                             bilayerDict=bilayerDict,
                             savedir=resdir, closeFlag=False, datestr=datestr)
     
     datestr = '' # Use this to redo the analysis
-    datestr = '20210228' # New testing
+    #datestr = '20210228' # New testing
     boundaries, boundaryVals, boundaryData = mapping.find_3D_phase_boundaries(r_avg,
                             h_range=h_range, thetaL_range=thetaL_range, T_range=T_range,
                             minima=minima, phases=phases, angleT_vals=thetaT, angle0_vals=theta0)

@@ -29,9 +29,26 @@ def import_rconst_data(sourcedir, bilayerDict={}, setStartLoadToZero=False, m=0)
                                             setStartLoadToZero=setStartLoadToZero,
                                             m=m, figFlag=False)
     h_vals = ucdf.h.unique()
-    ucdf_Y = ucdf.loc[ucdf["magnets"] == 1] 
+    #ucdf_Y = ucdf.loc[ucdf["magnets"] == 1] 
     for h in h_vals:
-        experiment.plot_magnet_and_T_comparison(ucdf_Y[ucdf["h"] == h], 
+        experiment.plot_magnet_and_T_comparison(ucdf[ucdf["h"] == h], 
+                                                title=f'rconst, $h$ = {1e3*h} mm')
+    r_avg = ucdf["r"].mean()
+
+    return r_avg, ucdf
+
+
+def import_rconst_data(sourcedir, bilayerDict={}, setStartLoadToZero=False, m=0):
+    """ Check how repeatably we can manufacture and test unit cells with
+        nominally identical hinge thickness ratio """
+    
+    ucdf = experiment.import_all_unit_cells(sourcedir, bilayerDict=bilayerDict, 
+                                            setStartLoadToZero=setStartLoadToZero,
+                                            m=m, figFlag=False)
+    h_vals = ucdf.h.unique()
+    #ucdf_Y = ucdf.loc[ucdf["magnets"] == 1] 
+    for h in h_vals:
+        experiment.plot_magnet_and_T_comparison(ucdf[ucdf["h"] == h], 
                                                 title=f'rconst, $h$ = {1e3*h} mm')
     r_avg = ucdf["r"].mean()
 
@@ -117,7 +134,7 @@ def analyze_rconst_moment(ucdf, k_sq_fit, bilayerDict):
     return moment_fit
 
 
-def plot_final_rconst_fit(ucdf, k_sq_fit, m_fit, p_lim_fit, bilayerDict, limFlag='exp'):
+def plot_final_rconst_fit(ucdf, k_sq_fit, m_fit, p_lim_fit, bilayerDict, d_fit=0.018, limFlag='exp'):
     """Plot force-displacement curves for experiment data and best fit for all data,
     including markers at roots"""
     
@@ -240,20 +257,21 @@ def analyze_rconst_collision(ucdf, k_sq_fit, moment_fit, bilayerDict):
         (A, B) for exponential fit"""
     ucdf_Y = ucdf.loc[ucdf["magnets"] == 1]  
     
-    p_fit_all = fit_constant_collision(ucdf_Y, [k_sq_fit, moment_fit, bilayerDict])
+    p_fit_all = fit_constant_collision(ucdf_Y, [k_sq_fit, 0, bilayerDict])
     p_lim_fit = p_fit_all.x
     
     return p_lim_fit
 
 
-def fit_constant_collision(ucdf, p_given, p_lim_guess=[3e-10, 18], limFlag='exp'):
+def fit_constant_collision(ucdf, p_given, p_lim_guess=[3e-22, 51], limFlag='exp'): #[3e-10, 18]
     """ Takes dataframe containing all non-magnet samples and returns the 
         square stiffness and collision parameters which minimizes the
         least-squares error for all fit """
        
     p_fit = opt.least_squares(residual_constant_collision, p_lim_guess,
                               args=(ucdf, p_given),
-                              kwargs={'limFlag':limFlag})
+                              kwargs={'limFlag':limFlag},
+                              xtol=1e-10, gtol=1e-10)
     return p_fit
 
 
@@ -262,6 +280,8 @@ def residual_constant_collision(p, ucdf, params_given, limFlag='exp'):
         and best-fit collision parameters, for all force-displacement relations """
 
     k_sq_fit, m_fit, bilayerDict = params_given
+
+    print(f"running... p = {p}")    
 
     # Find individual best-fit values for k_q
     nSamples = len(ucdf)
@@ -272,21 +292,27 @@ def residual_constant_collision(p, ucdf, params_given, limFlag='exp'):
         unitModel = m3.MetamaterialModel(unitData.h, unitData.r, ANGLE_NEAR_ZERO,
                                               T=unitData.T, d=unitData.d, 
                                               k_sq=k_sq_fit, p_lim=p, limFlag=limFlag,
-                                              m = m_fit,
+                                              m=m_fit,
                                               hasMagnets=bool(unitData.magnets),
                                               analysisFlag=False,
                                               **bilayerDict)
 
         # Use only data nera zero crossings!
-        nearZeroIndices = find_near_zero_indices(unitData.load, window=30)
+        #nearZeroIndices = find_near_zero_indices(unitData.load, window=30)
+        minStrain = 0.26
+        minIndex = np.where(unitData.strain > minStrain)[0][0]
+        
+        plt.figure()
+        plt.plot(unitData.strain, unitData.load, 'k')
+        plt.plot(unitData.strain[minIndex:], unitData.load[minIndex:], 'ro', linewidth=0)
         
         p_given = [unitModel.total_angle, unitModel.k_eq, unitData.d/2, m_fit]
         p_guess = p
-        p_lim_fit_individual[count,:] = model.approximate_only_collision(unitData.disp[nearZeroIndices],
-                                                                       -unitData.load[nearZeroIndices],
+        p_lim_fit_individual[count,:] = model.approximate_only_collision(unitData.disp[minIndex:],
+                                                                       -unitData.load[minIndex:],
                                                                        p_guess, p_given)
         count += 1
-
+        
     # Reshape and subtract
     p_lim_fit_individual = p_lim_fit_individual.flatten()
     p_lim_fit_individual = p_lim_fit_individual.reshape((-1,1))
@@ -298,6 +324,94 @@ def residual_constant_collision(p, ucdf, params_given, limFlag='exp'):
     p_lim_fit_all = p_lim_fit_all.reshape((-1,1))
 
     residual = p_lim_fit_individual - p_lim_fit_all
+    residual = residual.flatten()
+
+    return residual
+
+
+# =============================================================================
+# New fit??
+# =============================================================================
+def update_data_with_d(ucdf, d_fit):
+    ucdf_update = pd.DataFrame()
+    for index, row in ucdf.iterrows():
+        data = row["data"]
+        data.reset_d(d_fit)
+        ucdf_update = ucdf_update.append(data.get_Series(), ignore_index=True)
+    
+    return ucdf_update
+
+def analyze_rconst_ksq_and_d(ucdf, m_fit, bilayerDict):
+    """ Analysis of just with-magnet case: find best-fit ksq and d parameters"""
+    ucdf_Y = ucdf.loc[ucdf["magnets"] == 1]  
+    p_given = [m_fit, bilayerDict]
+    p_fit_all = fit_constant_ksq_and_d(ucdf_Y, p_given)
+    p_fit = p_fit_all.x
+    
+    return p_fit
+
+
+def fit_constant_ksq_and_d(ucdf, p_given, p_guess=[0.005, 0.009], limFlag='exp'): 
+    """ Takes dataframe containing all non-magnet samples and returns the 
+        square stiffness and diagonal length which minimizes the
+        least-squares error for all fit """
+       
+    p_fit = opt.least_squares(residual_constant_ksq_and_d, p_guess,
+                              args=(ucdf, p_given),
+                              kwargs={'limFlag':limFlag})
+    return p_fit
+
+
+def residual_constant_ksq_and_d(p, ucdf, params_given, limFlag='exp'):
+    """ Cost function: minimize difference between constant collision parameters
+        and best-fit collision parameters, for all force-displacement relations """
+
+    m_fit, bilayerDict = params_given
+    k_sq_fit, L_fit = p
+
+    print(f"running... p = {p}")    
+
+    # Find individual best-fit values for k_q
+    nSamples = len(ucdf)
+    p_fit_individual = np.zeros((nSamples,2))
+    count = 0
+    for index, row in ucdf.iterrows():
+        unitData = row["data"]
+        unitData.reset_d(2*L_fit)
+        unitModel = m3.MetamaterialModel(unitData.h, unitData.r, ANGLE_NEAR_ZERO,
+                                         T=unitData.T, p_lim=[0,0], limFlag=limFlag,
+                                         k_sq=k_sq_fit, d=2*L_fit, 
+                                         m=m_fit, 
+                                         hasMagnets=bool(unitData.magnets),
+                                         analysisFlag=False,
+                                         **bilayerDict)
+
+        # Use only data before collision
+        maxStrain = 0.15
+        maxIndex = np.where(unitData.strain < maxStrain)[0][-1]
+        
+        plt.figure()
+        plt.plot(unitData.strain, unitData.load, 'k')
+        plt.plot(unitData.strain[:maxIndex], unitData.load[:maxIndex], 'ro', linewidth=0)
+        
+        p_given = [unitModel.total_angle, unitModel.hinge.k, m_fit]
+        p_guess = p
+        p_fit_individual[count,:] = model.approximate_ksq_L(unitData.disp[:maxIndex],
+                                                            -unitData.load[:maxIndex],
+                                                            p_guess, p_given)
+        count += 1
+        
+    # Reshape and subtract
+    p_fit_individual = p_fit_individual.flatten()
+    p_fit_individual = p_fit_individual.reshape((-1,1))
+
+    p_fit_all = np.zeros((nSamples,2))
+    p_fit_all[:,0] = p[0]
+    p_fit_all[:,1] = p[1]
+    p_fit_all = p_fit_all.flatten()
+    p_fit_all = p_fit_all.reshape((-1,1))
+
+    residual = p_fit_individual - p_fit_all
     residual = residual.flatten()
 
     return residual

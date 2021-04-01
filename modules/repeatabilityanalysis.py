@@ -43,8 +43,9 @@ def analyze_repeatability_data(sourcedir, bilayerDict, setStartLoadToZero=False,
         ucdf_avg_N = ucdf_avg_N.append(row,ignore_index=True)
         unitData = row["data"]
         unitModel = metamat.MetamaterialModel(unitData.h, unitData.r, ANGLE_NEAR_ZERO,
-                                              T=unitData.T, d=unitData.d, 
-                                              k_sq=ksq, loadFlag=True, hasMagnets=bool(unitData.magnets),
+                                              T=unitData.T, d=unitData.d,
+                                              k_sq=k_sq, m=m, p_lim=p_lim,
+                                              loadFlag=True, hasMagnets=bool(unitData.magnets),
                                               **bilayerDict)
         ucdf_model.append(unitModel.model_load_disp(unitData.disp))
     
@@ -67,7 +68,8 @@ def analyze_repeatability_data(sourcedir, bilayerDict, setStartLoadToZero=False,
         plt.plot(disp_plt, unitData.load, 'k', label="experiment")
         unitModel = metamat.MetamaterialModel(unitData.h, unitData.r, ANGLE_NEAR_ZERO,
                                               T=unitData.T, d=unitData.d, 
-                                              k_sq=ksq, loadFlag=True, hasMagnets=bool(unitData.magnets),
+                                              k_sq=k_sq, m=m, p_lim=p_lim,
+                                              loadFlag=True, hasMagnets=bool(unitData.magnets),
                                               **bilayerDict)
         plt.plot(disp_plt, unitModel.model_load_disp(unitData.disp), 'r', label="model")
         plt.fill_between(disp_plt, unitData.load-unitData.std, unitData.load+unitData.std, color='k', alpha=0.2)
@@ -77,7 +79,7 @@ def analyze_repeatability_data(sourcedir, bilayerDict, setStartLoadToZero=False,
         p_given_exp = [unitModel.total_angle, unitModel.d/2, 'exp']
         p_guess_exp = [0.001, 5e-20, 50]
         params = model.approximate_spring(unitData.disp, -(unitData.load), p_guess_exp, p_given_exp)
-        print(params)
+        print(f"Best-fit k, p_lim: {params[0]}, {params[1:]}")
 
     # Initialize plot info
     colors = ['r','g','b']
@@ -102,8 +104,8 @@ def analyze_repeatability_data(sourcedir, bilayerDict, setStartLoadToZero=False,
         disp_plt = unitData.strain        
         unitModel = metamat.MetamaterialModel(unitData.h, unitData.r, ANGLE_NEAR_ZERO,
                                               T=unitData.T, d=unitData.d, 
-                                              k_sq=ksq, loadFlag=True, hasMagnets=bool(unitData.magnets),
-                                              m=m, p_lim=p_lim,
+                                              k_sq=k_sq, m=m, p_lim=p_lim,
+                                              loadFlag=True, hasMagnets=bool(unitData.magnets),
                                               **bilayerDict)
         print(r"T = {0}C, $\theta_T$ = {1:.2f}, k = {2:.2e}".format(unitData.T, np.degrees(unitModel.total_angle), unitModel.hinge.k))
         
