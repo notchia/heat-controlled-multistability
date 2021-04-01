@@ -286,12 +286,15 @@ def compute_unitCell_mean_std(ucdf, nPoints=2500):
     return meanUnit
 
 
-def plot_magnet_and_T_comparison(ucdf, modellist=None, stdFlag=False, legendOut=False):
+def plot_magnet_and_T_comparison(ucdf, modellist=None, stdFlag=False, legendOut=False,
+                                 title=''):
     """ Plot and compare data, grouping by magnets and temperature """
     
     plt.figure(dpi=200)
     plt.xlabel("Strain, $\delta/d$")
     plt.ylabel("Load (N)")
+    if title != '':
+        plt.title(title)
     colors = ['r','g','b']
     styles = ['-','--']
     TLabels = ['RT', 'T~45$^\circ$', 'T~75$^\circ$']

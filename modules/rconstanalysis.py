@@ -28,8 +28,11 @@ def import_rconst_data(sourcedir, bilayerDict={}, setStartLoadToZero=False, m=0)
     ucdf = experiment.import_all_unit_cells(sourcedir, bilayerDict=bilayerDict, 
                                             setStartLoadToZero=setStartLoadToZero,
                                             m=m, figFlag=False)
-    experiment.plot_magnet_and_T_comparison(ucdf, legendOut=True)
-
+    h_vals = ucdf.h.unique()
+    ucdf_Y = ucdf.loc[ucdf["magnets"] == 1] 
+    for h in h_vals:
+        experiment.plot_magnet_and_T_comparison(ucdf_Y[ucdf["h"] == h], 
+                                                title=f'rconst, $h$ = {1e3*h} mm')
     r_avg = ucdf["r"].mean()
 
     return r_avg, ucdf
