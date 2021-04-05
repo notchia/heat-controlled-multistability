@@ -7,6 +7,7 @@ Fit experimental data for bilayer hinge curvature.
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+import scipy.optimize as opt
 
 import modules.bilayermodel as bl
 
@@ -38,6 +39,9 @@ def analyze_bending_data(paramfile, datafile, nSamples=5,
     nTemps = curvature_avg.shape[0]
     nCombos = curvature_avg.shape[1]
 
+    b = [0,1]
+    bFlag = 'lin'
+
     # Compute modeled curvature values for these parameters -------------------
     # Note: arc length = thickness (s = 0 + 1h) as normalization parameter
     T_range = np.arange(T[0], T[-1], 1)
@@ -47,7 +51,7 @@ def analyze_bending_data(paramfile, datafile, nSamples=5,
     for i in range(nCombos):
         h_val = h[i]
         r_val = r[i]
-        bilayer = bl.BilayerModel(h_val*1e-3, r_val, b=[0,1], bFlag='lin',
+        bilayer = bl.BilayerModel(h_val*1e-3, r_val, b=b, bFlag=bFlag,
                                   LCE_modulus_params=LCE_modulus_params,
                                   LCE_strain_params=LCE_strain_params)
         for j in range(nTempRange):
@@ -101,6 +105,48 @@ def analyze_bending_data(paramfile, datafile, nSamples=5,
                                  title='bilayer_temperature-angle_model',
                                  ylabel='Normalized curvature change\n$h(\kappa - \kappa_0)$')    
 
+
+# =============================================================================
+#     NEW THING: find best-fit r for each
+# =============================================================================
+    r_fits = np.zeros(nCombos)
+    for i in range(nCombos):
+        p_given = [h[i], b, bFlag, LCE_modulus_params, LCE_strain_params]  
+        r_fits[i] = fit_r(r[i], p_given, curvature_avg[:,i], T)
+
+    T_range = np.arange(T[0], T[-1], 1)
+    nTempRange = len(T_range)
+    curvature_model_r = np.zeros((nTempRange, nCombos))
+    curvature_change_model_r = np.zeros((nTempRange, nCombos))
+    for i in range(nCombos):
+        h_val = h[i]
+        r_val = r_fits[i]
+        bilayer = bl.BilayerModel(h_val*1e-3, r_val, b=b, bFlag=bFlag,
+                                  LCE_modulus_params=LCE_modulus_params,
+                                  LCE_strain_params=LCE_strain_params)
+        for j in range(nTempRange):
+            bilayer.update_temperature(T_range[j])
+            curvature_model_r[j,i] = bilayer.curvature
+        curvature_change_model_r[:,i] = curvature_model_r[:,i] - curvature_model_r[0,i]
+
+    plot_values_with_temperature(angle_avg, angle_std,
+                                 y_model=1e-3*curvature_change_model_r,
+                                 title='bilayer_temperature-angle_model_best-fit-r',
+                                 ylabel='Normalized curvature change\n$h(\kappa - \kappa_0)$')    
+
+    # Plot r fit
+    r_relation, residuals, _, _, _ = np.polyfit(r, r_fits, 1, full=True)
+    plt.figure('best-fit r', dpi=200)
+    plt.xlabel('r measured')
+    plt.ylabel('r fit')
+    plt.plot(r, r_fits, 'o')
+    plt.plot(r, np.polyval(r_relation, r),
+             label=f'linear fit, y = {r_relation[0]:.3f}x + {r_relation[1]:.3f}, RSS = {residuals[0]:.2e}')
+    plt.legend()
+    plt.tight_layout()
+    
+
+    '''
     # Change in normalized curvature (curvature normalized by multiplication by r^2): 
     normalized_curvature_r2_avg = np.multiply(curvature_change_avg, np.square(r))
     normalized_curvature_r2_std = np.multiply(curvature_std, np.square(r))
@@ -115,6 +161,7 @@ def analyze_bending_data(paramfile, datafile, nSamples=5,
                                  y_model=normalized_angle_r2_model,
                                  title='bilayer_temperature-angle_model_norm',
                                  ylabel='Normalized curvature change\n$hr^2(\kappa - \kappa_0)$')
+    '''
 
     # Can the curvature be normalized by some values? -------------------------
     def plot_values_with_parameter(x_avg, x_std, y_avg, y_std,
@@ -155,3 +202,34 @@ def analyze_bending_data(paramfile, datafile, nSamples=5,
                                ylabel='Normalized curvature change $h(\kappa - \kappa_0)$')
     
     return
+
+def fit_r(p_guess, p_given, curvatures, temperatures):
+    """Find best-fit r for a particular sample"""
+    if np.isnan(curvatures[-1]):
+        curvatures = curvatures[:-1]
+        temperatures = temperatures[:-1]
+    
+    p_fit = opt.least_squares(residual_bilayer, p_guess,
+                              args=(curvatures, temperatures, p_given))
+    return p_fit.x[0]
+        
+def residual_bilayer(p, curvatures, temperatures, p_given):
+    """Residual for finding best fit r"""
+    h, b, bFlag, LCE_modulus_params, LCE_strain_params = p_given    
+    bilayer = bl.BilayerModel(1e-3*h, p, b=b, bFlag=bFlag,
+                              LCE_modulus_params=LCE_modulus_params,
+                              LCE_strain_params=LCE_strain_params)
+    
+    curvatures_fit = np.zeros_like(curvatures)
+    
+    for i, T in enumerate(temperatures):
+        bilayer.update_temperature(T)
+        curvatures_fit[i] = bilayer.curvature
+    curvatures_fit = curvatures_fit - curvatures_fit[0]
+    
+    residual = curvatures - curvatures_fit
+    
+    return residual
+        
+    
+    
