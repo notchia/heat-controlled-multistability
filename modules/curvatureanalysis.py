@@ -92,7 +92,7 @@ def analyze_bending_data(paramfile, datafile, nSamples=5,
                                  RTindex=0)
 
     # Change in curvature
-    curvature_change_avg = curvature_avg - curvature_avg[0]
+    curvature_change_avg = curvature_avg - curvature_avg[0,:]
 
     # Change in angle (curvature normalized by h): 
     # Use arc length s = thickness h to compute normalized angle
@@ -112,7 +112,7 @@ def analyze_bending_data(paramfile, datafile, nSamples=5,
     r_fits = np.zeros(nCombos)
     for i in range(nCombos):
         p_given = [h[i], b, bFlag, LCE_modulus_params, LCE_strain_params]  
-        r_fits[i] = fit_r(r[i], p_given, curvature_avg[:,i], T)
+        r_fits[i] = fit_r(r[i], p_given, curvature_change_avg[:,i], T)
 
     T_range = np.arange(T[0], T[-1], 1)
     nTempRange = len(T_range)
@@ -130,18 +130,22 @@ def analyze_bending_data(paramfile, datafile, nSamples=5,
         curvature_change_model_r[:,i] = curvature_model_r[:,i] - curvature_model_r[0,i]
 
     plot_values_with_temperature(angle_avg, angle_std,
-                                 y_model=1e-3*curvature_change_model_r,
+                                 y_model=1e-3*np.multiply(h,curvature_change_model_r),
                                  title='bilayer_temperature-angle_model_best-fit-r',
                                  ylabel='Normalized curvature change\n$h(\kappa - \kappa_0)$')    
 
     # Plot r fit
     r_relation, residuals, _, _, _ = np.polyfit(r, r_fits, 1, full=True)
-    plt.figure('best-fit r', dpi=200)
+    fig = plt.figure('best-fit r', dpi=200)
+    ax = fig.add_subplot()
+    ax.set_aspect('equal')
     plt.xlabel('r measured')
     plt.ylabel('r fit')
-    plt.plot(r, r_fits, 'o')
+    plt.errorbar(r, r_fits, xerr=r_std, fmt='o', capsize=2)
     plt.plot(r, np.polyval(r_relation, r),
-             label=f'linear fit, y = {r_relation[0]:.3f}x + {r_relation[1]:.3f}, RSS = {residuals[0]:.2e}')
+             label=f'linear fit, y = {r_relation[0]:.3f}x + {r_relation[1]:.3f}\n(RSS = {residuals[0]:.2e})')
+    plt.xlim([0,0.65])
+    plt.ylim([0,0.65])
     plt.legend()
     plt.tight_layout()
     
@@ -201,16 +205,18 @@ def analyze_bending_data(paramfile, datafile, nSamples=5,
                                xlabel='Total thickness $h$ (mm)',
                                ylabel='Normalized curvature change $h(\kappa - \kappa_0)$')
     
-    return
+    return r_relation
 
 def fit_r(p_guess, p_given, curvatures, temperatures):
-    """Find best-fit r for a particular sample"""
+    """Find best-fit r for a particular sample from curvature change"""
     if np.isnan(curvatures[-1]):
         curvatures = curvatures[:-1]
         temperatures = temperatures[:-1]
     
     p_fit = opt.least_squares(residual_bilayer, p_guess,
-                              args=(curvatures, temperatures, p_given))
+                              args=(curvatures, temperatures, p_given),
+                              ftol=1e-10, gtol=1e-10, xtol=1e-10)
+    print(f"r guess:\t{p_guess:.2f}\nr fit:\t\t{p_fit.x[0]:.2f}\noptimality (uniform norm of gradient): {p_fit.optimality:.2e}")
     return p_fit.x[0]
         
 def residual_bilayer(p, curvatures, temperatures, p_given):

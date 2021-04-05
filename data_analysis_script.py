@@ -82,7 +82,7 @@ if __name__ == "__main__":
     
     datafile = os.path.join(sourcedir, "200819_bilayer_ImageJ_curvature.csv")
     paramfile = os.path.join(sourcedir, "200819_bilayer_parameters.csv")
-    curvature.analyze_bending_data(paramfile, datafile, LCE_modulus_params=modulusParams, LCE_strain_params=strainParams, 
+    r_relation = curvature.analyze_bending_data(paramfile, datafile, LCE_modulus_params=modulusParams, LCE_strain_params=strainParams, 
                                    saveFlag=SAVE_FLAG, figdir=savedir, verboseFlag=VERBOSE_FLAG)  
     hinge.analyze_curvature_change_with_temp(LCE_modulus_params=modulusParams,
                                              LCE_strain_params=strainParams, 
@@ -202,7 +202,10 @@ if __name__ == "__main__":
     T_isotherm = [25.0, 45.0, 78.0] # CURRENTLY IN MANUSCRIPT
     i_isotherm = [np.argwhere(T_range == T_val)[0][0] for T_val in T_isotherm]
     
-    r_range = np.arange(0.0,1.0,0.005)
+    r_range_orig = np.arange(0.0,1.0,0.005)
+    r_range = np.polyval(r_relation, r_range_orig)
+    #r_val = r_avg
+    r_val = np.polyval(r_relation, r_avg)
     
     item_header("h-r-T parameter space analysis")
     datestr = '' # Use this to redo the analysis
@@ -223,7 +226,8 @@ if __name__ == "__main__":
     item_header("h-thetaL-T parameter space analysis")
     datestr = '' # Use this to redo the analysis
     #datestr = '20210228' # New testing
-    minima, phases, thetaT, theta0, paramDict, sampleModel = mapping.run_composite_phase_boundary_analysis(r_avg,
+
+    minima, phases, thetaT, theta0, paramDict, sampleModel = mapping.run_composite_phase_boundary_analysis(r_val,
                             h_range=h_range, thetaL_range=thetaL_range, T_range=T_range,
                             k_sq=ksq_fit, m=moment_fit, p_lim=p_lim_fit,
                             bilayerDict=bilayerDict,
@@ -231,7 +235,7 @@ if __name__ == "__main__":
     
     datestr = '' # Use this to redo the analysis
     #datestr = '20210228' # New testing
-    boundaries, boundaryVals, boundaryData = mapping.find_3D_phase_boundaries(r_avg,
+    boundaries, boundaryVals, boundaryData = mapping.find_3D_phase_boundaries(r_val,
                             h_range=h_range, thetaL_range=thetaL_range, T_range=T_range,
                             minima=minima, phases=phases, angleT_vals=thetaT, angle0_vals=theta0)
     
@@ -240,5 +244,5 @@ if __name__ == "__main__":
     
     #%%
     for T in T_range:
-        mapping.plot_isotherm(r_avg, T, phases, theta0, h_range=h_range, thetaL_range=thetaL_range,
+        mapping.plot_isotherm(r_val, T, phases, theta0, h_range=h_range, thetaL_range=thetaL_range,
                       T_range=T_range, savedir=resdir, closeFlag=False)   
