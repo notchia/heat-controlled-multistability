@@ -21,10 +21,9 @@ class MetamaterialModel:
         LCE:total thickness ratio r. Initialized at room temperature, but can
         be updated for any temperature. Specify only one of s or b."""
     def __init__(self, h_total, ratio, thetaL, T=25.0,
-                 LCE_strain_params=[0.039457,142.37,6.442e-3],
-                 LCE_modulus_params=[-8.43924097e-02,2.16846882e+02,3.13370660e+05],
-                 d=0.018, w=0.010, b=[], s=0, m=0.1471, bFlag='lin',
-                 limFlag='exp', p_lim=[3e-22, 51], k_sq=0.0,
+                 LCE_strain_params=[], LCE_modulus_params=[],
+                 d=0.018, w=0.010, b=[], s=0, m=0, bFlag='lin',
+                 limFlag='exp', p_lim=[], k_sq=0.0,
                  plotFlag=False, verboseFlag=False, loadFlag=False, hasMagnets=True,
                  analysisFlag=True):
         
@@ -35,6 +34,7 @@ class MetamaterialModel:
         self.thetaL = thetaL        # [rad]         As-fabricated angle of hinge
         
         # Material parameters: fit to data
+        assert ((m != 0) if (hasMagnets) else True), 'Set a nonzero magnetic moment if the sample has magnets'
         self.m = m    # [J/Celcius] or [A m^2] magnetic moment (measured)
         self.hinge = bilayer.BilayerModel(h_total, ratio, T=T, 
                                           LCE_strain_params=LCE_strain_params,
@@ -47,6 +47,7 @@ class MetamaterialModel:
 
         # Model for effective stiffness of the squares when in contact
         assert (limFlag == 'pcw' or limFlag == 'exp'), 'Choose piecewise (pcw) or exponential (exp) collision model'
+        assert (len(p_lim) > 0), 'Set p_lim'
         self.limFlag = limFlag # 'pcw' OR 'exp'
         self.p_lim = p_lim # (k_lim, q_lim) OR (A, B)
         self.k_sq = k_sq

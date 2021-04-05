@@ -18,9 +18,8 @@ class BilayerModel:
         LCE:total thickness ratio r. Initialized at room temperature, but can
         be updated for any temperature. Specify only one of s or b."""
     def __init__(self, h_total, ratio, T=25.0,
-                 LCE_strain_params=[0.039457,142.37,6.442e-3],
-                 LCE_modulus_params=[-8.43924097e-02,2.16846882e+02,3.13370660e+05],
-                 w=0.010, b=[], s=0, bFlag='lin'):
+                 LCE_strain_params=[], LCE_modulus_params=[],
+                 w=0.010, s=0, b=[], bFlag='lin'):
         
         assert T > 20.0, "Invalid T: lower than room temperature"
         assert h_total > 0, "Invalid h: must be positive"
@@ -35,8 +34,6 @@ class BilayerModel:
         # Material parameters
         self.LCE_strain_params = LCE_strain_params
         self.LCE_modulus_params = LCE_modulus_params
-        self.E_PDMS = PDMS.model_elastic_modulus(T) # [Pa] traditional AML PDMS; default from 08/07/20
-        self.E_LCE = LCE.model_elastic_modulus(T, *LCE_modulus_params) # [Pa] Rui's formulation; default from 08/17/20
         
         # Geometric parameters: out-of-plane width w, and arc length s
         self.w = w
@@ -52,23 +49,29 @@ class BilayerModel:
         self.h_PDMS = h_total*(1-ratio)    # [m] hinge thickness, PDMS
         self.h_LCE =  h_total*ratio        # [m] hinge thickness, LCE. Assume LCE is on "inside" of hinge
         
-        self.I_PDMS, self.I_LCE = self._calculate_2nd_moments() # [m^4] w.r.t individual centroids
-        self.I_PDMS_NA, self.I_LCE_NA = self._calculate_2nd_moments_neutral_axis() # [m^4] w.r.t. neutral axis
-        self.k = self._calculate_stiffness() # [m] stiffness of composite hinge
-        self.curvature = self._calculate_curvature(T) # [1/m]
-        self.thetaT = self._calculate_angle(T) # [radians]
+        # Calculate all temperature-dependent parameters:
+        # - material stiffness for each material
+        # - second moments of area for each material, w.r.t. both neutral axis and centroid
+        # - stiffness, curvature, and angle
+        self._set_temperature_dependent_parameters()
 
 
     def update_temperature(self, T):
         """ Update hinge properties given new temperature """  
         self.T = T
-        self.E_LCE = LCE.model_elastic_modulus(T, *(self.LCE_modulus_params))
-        self.I_PDMS, self.I_LCE = self._calculate_2nd_moments()
-        self.k = self._calculate_stiffness()
-        self.curvature = self._calculate_curvature(T)
-        self.thetaT = self._calculate_angle(T)
+        self._set_temperature_dependent_parameters()
         return
     
+    
+    def _set_temperature_dependent_parameters(self):
+        """ Set all temperature-dependent parameters """  
+        self.E_PDMS = PDMS.model_elastic_modulus(self.T) # [Pa] traditional AML PDMS; default from 08/07/20
+        self.E_LCE = LCE.model_elastic_modulus(self.T, *(self.LCE_modulus_params)) # [Pa] Rui's formulation; default from 08/17/20
+        self.I_PDMS, self.I_LCE = self._calculate_2nd_moments()  # [m^4] w.r.t individual centroids
+        self.I_PDMS_NA, self.I_LCE_NA = self._calculate_2nd_moments_neutral_axis() # [m^4] w.r.t neutral axis
+        self.k = self._calculate_stiffness() # [m] stiffness of composite hinge
+        self.curvature = self._calculate_curvature() # [1/m]
+        self.thetaT = self._calculate_angle() # [radians]     
     
     def _calculate_arc_length(self, b, bFlag):
         """ Using arc length parameters b, compute effective arc length s from
@@ -109,23 +112,23 @@ class BilayerModel:
         
         return I_PDMS_NA, I_LCE_NA
     
-    def _calculate_curvature(self, T):
+    def _calculate_curvature(self):
         """ Calculate curvature [1/m] at a given temperature.
-            Second moments of area are defined about each component's center. """
+            Second moments of area are defined about each component's centroid. """
         if self.ratio == 0:
             kappa = 0
         else:
-            numer = LCE.model_strain(T, *(self.LCE_strain_params))
+            numer = LCE.model_strain(self.T, *(self.LCE_strain_params))
             denom = ((2/self.h_total)*(self.E_LCE*self.I_LCE + self.E_PDMS*self.I_PDMS)
                      *(1/(self.E_LCE*self.h_LCE*self.w) + 1/(self.E_PDMS*self.h_PDMS*self.w))
                      + (self.h_total/2))
             kappa = numer/denom
         return -kappa
     
-    def _calculate_angle(self, T):
-        """ Calculate hinge angle at a given temperature as s*kappa
+    def _calculate_angle(self):
+        """ Calculate hinge angle at a given temperature as s*kappa. 
             Note that this is different from the unit cell definition of thetaT
-            by a factor of 2. (DOUBLE CHECK THIS)"""
+            by a factor of 2."""
         angle = self.s*self.curvature
         return angle
 
@@ -172,7 +175,9 @@ def analyze_curvature_change_with_temp(LCE_modulus_params=[], LCE_strain_params=
         kappaT_vals = np.zeros((len(T_range), len(r_range)))
         thetaT_vals = np.zeros((len(T_range), len(r_range)))
         for j, r in enumerate(r_range):
-            bilayer = BilayerModel(h, r, LCE_modulus_params=LCE_modulus_params, s=h)
+            bilayer = BilayerModel(h, r, s=h,
+                                   LCE_modulus_params=LCE_modulus_params,
+                                   LCE_strain_params=LCE_strain_params)
             for i, T in enumerate(T_range):
                 bilayer.update_temperature(T)
                 kappaT_vals[i,j] = bilayer.curvature

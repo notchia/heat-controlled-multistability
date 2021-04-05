@@ -203,13 +203,14 @@ if __name__ == "__main__":
     i_isotherm = [np.argwhere(T_range == T_val)[0][0] for T_val in T_isotherm]
     
     r_range_orig = np.arange(0.0,1.0,0.005)
-    r_range = np.polyval(r_relation, r_range_orig)
-    #r_val = r_avg
-    r_val = np.polyval(r_relation, r_avg)
+    r_range = r_range_orig#np.polyval(r_relation, r_range_orig)
+    r_val = r_avg
+    #r_val = np.polyval(r_relation, r_avg)
     
     item_header("h-r-T parameter space analysis")
-    datestr = '' # Use this to redo the analysis
+    #datestr = '' # Use this to redo the analysis
     #datestr = '20210228' # New testing
+    datestr = '20210405'
     minimaMain, phasesMain, thetaTMain, theta0Main, paramDictMain, sampleModelMain = mapping.run_main_parameter_phase_boundary_analysis(0.0,
                             h_range=h_range, r_range=r_range, T_range=T_range,
                             k_sq=ksq_fit, m=moment_fit, p_lim=p_lim_fit,
@@ -224,7 +225,7 @@ if __name__ == "__main__":
     mapping.save_isotherms(datestr, resdir, phasesMain, i_isotherm, h_range, r_range, T_range, tag='Main')    
     
     item_header("h-thetaL-T parameter space analysis")
-    datestr = '' # Use this to redo the analysis
+    #datestr = '' # Use this to redo the analysis
     #datestr = '20210228' # New testing
 
     minima, phases, thetaT, theta0, paramDict, sampleModel = mapping.run_composite_phase_boundary_analysis(r_val,
@@ -233,7 +234,7 @@ if __name__ == "__main__":
                             bilayerDict=bilayerDict,
                             savedir=resdir, closeFlag=False, datestr=datestr)
     
-    datestr = '' # Use this to redo the analysis
+    #datestr = '' # Use this to redo the analysis
     #datestr = '20210228' # New testing
     boundaries, boundaryVals, boundaryData = mapping.find_3D_phase_boundaries(r_val,
                             h_range=h_range, thetaL_range=thetaL_range, T_range=T_range,

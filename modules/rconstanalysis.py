@@ -69,10 +69,11 @@ def analyze_rconst_ksq(ucdf, bilayerDict):
         unitModel = m3.MetamaterialModel(unitData.h, unitData.r, ANGLE_NEAR_ZERO,
                                               T=unitData.T, d=unitData.d,
                                               hasMagnets=bool(unitData.magnets), m=unitData.m,
+                                              p_lim = [0,0], # Assuming no collision
                                               **bilayerDict)
 
         # Use subset of load-disp data before collision begins to fit k_q
-        maxStrain = 0.15#0.225
+        maxStrain = 0.15
         maxIndex = np.where(unitData.strain < maxStrain)[0][-1]
         #p_given = [unitModel.total_angle, unitData.d/2]
         q0 = unitModel.total_angle
@@ -88,7 +89,7 @@ def analyze_rconst_ksq(ucdf, bilayerDict):
         count += 1
 
     # Find best-fit value for k_sq
-    p_fit_all = fit_constant_ksq(ucdf_Y, p_fit_spring_individual)
+    p_fit_all = fit_constant_ksq(ucdf_Y, p_fit_spring_individual, bilayerDict)
     k_sq_fit = p_fit_all.x[0]
     
     return k_sq_fit
@@ -100,7 +101,7 @@ def analyze_rconst_moment(ucdf, k_sq_fit, bilayerDict):
 
     p_guess = 0.20
     
-    # Find individual best-fit values for k_q
+    # Find individual best-fit values for magnetic moment
     p_fit_moment_individual = np.zeros(len(ucdf_Y))
     count = 0
     for index, row in ucdf_Y.iterrows():
@@ -108,12 +109,12 @@ def analyze_rconst_moment(ucdf, k_sq_fit, bilayerDict):
         unitModel = m3.MetamaterialModel(unitData.h, unitData.r, ANGLE_NEAR_ZERO,
                                               T=unitData.T, d=unitData.d,
                                               k_sq=k_sq_fit,
-                                              hasMagnets=0, p_lim=[0,0],
+                                              hasMagnets=False, p_lim=[0,0], # Assuming no collision
                                               **bilayerDict) # Using this only for k_eq
 
-        # Use only data nera zero crossings!
+        # Use only data near zero crossings, besides any due to collision!
         nearZeroIndices = find_near_zero_indices(unitData.load, window=100)
-        maxStrain = 0.175
+        maxStrain = 0.15
         maxIndex = np.where(unitData.strain > maxStrain)[0][0]
         nearZeroIndices = [i for i in nearZeroIndices if i < maxIndex]
         
@@ -172,19 +173,19 @@ def plot_final_rconst_fit(ucdf, k_sq_fit, m_fit, p_lim_fit, bilayerDict, d_fit=0
 # =============================================================================
 # Internal functions
 # =============================================================================
-def fit_constant_ksq(ucdf, p_fit_individual, k_sq_guess=1e-3, p_lim=[0,0], limFlag='exp'):
+def fit_constant_ksq(ucdf, p_fit_individual, bilayerDict, k_sq_guess=1e-3, p_lim=[0,0], limFlag='exp'):
     """ Takes dataframe containing all non-magnet samples and returns the 
         square stiffness and collision parameters which minimizes the
         least-squares error for all fit """
        
     p_fit = opt.least_squares(residual_constant_ksq, k_sq_guess,
-                              args=(p_fit_individual, ucdf),
+                              args=(p_fit_individual, ucdf, bilayerDict),
                               kwargs={'p_lim':p_lim, 'limFlag':limFlag})
     
     return p_fit
 
 
-def residual_constant_ksq(p, ksq_fit_individual, ucdf, p_lim=[0,0], limFlag='exp'):
+def residual_constant_ksq(p, ksq_fit_individual, ucdf, bilayerDict, p_lim=[0,0], limFlag='exp'):
     """ Cost function: minimize difference between equivalent spring constant
         for hinge in series with constant k_sq and the best-fit torsional
         spring constant, for all force-displacement relations """
@@ -195,9 +196,10 @@ def residual_constant_ksq(p, ksq_fit_individual, ucdf, p_lim=[0,0], limFlag='exp
     for index, row in ucdf.iterrows():
         unitData = row["data"]
         unitModel = m3.MetamaterialModel(unitData.h, unitData.r, ANGLE_NEAR_ZERO,
-                                              T=unitData.T, d=unitData.d, s=unitData.s, 
-                                              k_sq=k_sq, p_lim=p_lim, m=unitData.m,
-                                              hasMagnets=bool(unitData.magnets))
+                                         T=unitData.T, d=unitData.d, s=unitData.s, 
+                                         k_sq=k_sq, p_lim=p_lim, m=unitData.m,
+                                         hasMagnets=bool(unitData.magnets),
+                                         **bilayerDict)
         ksq_fit_all[count] = unitModel.k_eq
         count += 1
 

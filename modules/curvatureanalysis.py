@@ -144,8 +144,8 @@ def analyze_bending_data(paramfile, datafile, nSamples=5,
     plt.errorbar(r, r_fits, xerr=r_std, fmt='o', capsize=2)
     plt.plot(r, np.polyval(r_relation, r),
              label=f'linear fit, y = {r_relation[0]:.3f}x + {r_relation[1]:.3f}\n(RSS = {residuals[0]:.2e})')
-    plt.xlim([0,0.65])
-    plt.ylim([0,0.65])
+    plt.xlim([0,0.75])
+    plt.ylim([0,0.75])
     plt.legend()
     plt.tight_layout()
     

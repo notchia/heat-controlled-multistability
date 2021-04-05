@@ -121,7 +121,8 @@ def analyze_bending_angles(datapath, parampath, nSamples=3,
             s_val = s_avg[i]
             bilayer = bl.BilayerModel(h_val*1e-3, r_val, T=24.3,
                                       b=b_fit, bFlag='quad', 
-                                      LCE_modulus_params=LCE_modulus_params)
+                                      LCE_modulus_params=LCE_modulus_params,
+                                      LCE_strain_params=LCE_strain_params)
             theta0 = bilayer.thetaT
             for j, T_val in enumerate(T_range):
                 bilayer.update_temperature(T_val)
