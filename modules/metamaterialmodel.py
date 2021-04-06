@@ -25,7 +25,7 @@ class MetamaterialModel:
                  d=0.018, w=0.010, b=[], s=0, m=0, bFlag='lin',
                  limFlag='exp', p_lim=[], k_sq=0.0,
                  plotFlag=False, verboseFlag=False, loadFlag=False, hasMagnets=True,
-                 analysisFlag=True):
+                 analysisFlag=True, showWarnings=True):
         
         # Main model parameters
         self.T = T                  # [Celcius]     Temperature
@@ -287,10 +287,12 @@ class MetamaterialModel:
         # If p_lim is defined, directly use local minima to determine stability
         if all(self.p_lim):
             if numMin == 0:
-                print('WARNING: numMin = {0}... assuming LR bistable.'.format(numMin))
+                if showWarnings:
+                    print('WARNING: numMin = {0}... assuming LR bistable.'.format(numMin))
                 return 2, [], 1, [], [] 
             elif numMin > 3:
-                print('WARNING: numMin = {0}... will return empty lists instead of analyzing.'.format(numMin))
+                if showWarnings:
+                    print('WARNING: numMin = {0}... will return empty lists instead of analyzing.'.format(numMin))
                 return numMin, [], 1, [], []
             
             # Compute energy barriers for minima and energy differences between minima

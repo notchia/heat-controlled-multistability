@@ -21,22 +21,22 @@ ANGLE_NEAR_ZERO = 1e-8 # Since setting angle to exactly zero can give numerical 
 
 #%% Anaylze repeatability data
 def analyze_repeatability_data(sourcedir, bilayerDict, setStartLoadToZero=False,
-                               k_sq=4e-3, m=[0.1431], p_lim=[1e-14, 30],
+                               k_sq=0, m=0, p_lim=[],
                                saveFlag=False, figdir=''):
-    """ Check how repeatably we can manufacture and test unit cells with
-        nominally identical parameters """
+    """How repeatably can we manufacture and test unit cells with
+    nominally identical parameters? """
     
     # Import all sample test and corresponding information from the directory
     ucdf = experiment.import_all_unit_cells(sourcedir, setStartLoadToZero=setStartLoadToZero,
-                                            bilayerDict=bilayerDict)
-    experiment.plot_magnet_and_T_comparison(ucdf, legendOut=True)    
-    
-    ksq = k_sq
+                                            bilayerDict=bilayerDict)   
 
-    # Generate UCDF for averaged data (for samples magnets)
+    # Generate DataFrame for averaged no-magnet data and for model based on
+    # r-const fit parameters
     ucdf_avg_N = pd.DataFrame()
     ucdf_model = []
-    for T_group in range(3):
+    nGroups = 3
+    print("Analysis of averaged no-magnet force-displacement data:")
+    for T_group in range(nGroups):
         subframe = ucdf.loc[(ucdf["T_group"] == T_group) & (ucdf["magnets"] == 0)]
         unitCell_avg = experiment.compute_unitCell_mean_std(subframe)
         row = unitCell_avg.get_Series()
@@ -49,14 +49,13 @@ def analyze_repeatability_data(sourcedir, bilayerDict, setStartLoadToZero=False,
                                               **bilayerDict)
         ucdf_model.append(unitModel.model_load_disp(unitData.disp))
     
-    # Plot comaprison between model and experiment for no-magnet cases
-    experiment.plot_magnet_and_T_comparison(ucdf_avg_N, modellist=ucdf_model, stdFlag=True)
-    if saveFlag:
-        title = 'unitCell_repeatability_force_N'
-        plt.savefig(os.path.join(figdir,"{0}.png".format(title)), dpi=200)
-        plt.savefig(os.path.join(figdir,"{0}.svg".format(title)), transparent=True)   
- 
-   
+    # Show raw data, compare between model and averaged data
+    experiment.plot_magnet_and_T_comparison(ucdf[ucdf["magnets"] == 0])
+    experiment.plot_magnet_and_T_comparison(ucdf_avg_N, modellist=ucdf_model,
+                                            saveFlag=saveFlag, savedir=figdir,
+                                            stdFlag=True, title='unitCell_repeatability_force_N')
+
+   # Find best-fit model parameters
     for index, row in ucdf_avg_N.iterrows():
         unitData = row["data"]
         plt.figure(dpi=200)
@@ -73,13 +72,12 @@ def analyze_repeatability_data(sourcedir, bilayerDict, setStartLoadToZero=False,
                                               **bilayerDict)
         plt.plot(disp_plt, unitModel.model_load_disp(unitData.disp), 'r', label="model")
         plt.fill_between(disp_plt, unitData.load-unitData.std, unitData.load+unitData.std, color='k', alpha=0.2)
-        print(r"T = {0}C, $\theta_T$ = {1:.2f}, k = {2:.2e}".format(unitData.T, np.degrees(unitModel.total_angle), unitModel.hinge.k))
         plt.legend()  
         
         p_given_exp = [unitModel.total_angle, unitModel.d/2, 'exp']
         p_guess_exp = [0.001, 5e-20, 50]
         params = model.approximate_spring(unitData.disp, -(unitData.load), p_guess_exp, p_given_exp)
-        print(f"Best-fit k, p_lim: {params[0]}, {params[1:]}")
+        print(f"For (h, r, T) = ({1e3*unitData.h}, {unitData.r}, {unitData.T:.0f}), best-fit k = {1e3*params[0]:.2f} mNm, p_lim = [{params[1]:.2e}, {params[2]:.1f}]")
 
     # Initialize plot info
     colors = ['r','g','b']
@@ -95,6 +93,7 @@ def analyze_repeatability_data(sourcedir, bilayerDict, setStartLoadToZero=False,
     plt.axhline(color='k',linewidth=1)
 
     # Analyze sample tests which include magnets
+    print("Plotting with-magnet force-displacement curves with provided model parameters...")
     ucdf_Y = ucdf.loc[ucdf["magnets"] == 1]  
     for index, row in ucdf_Y.iterrows():
         unitData = row["data"]
@@ -107,9 +106,8 @@ def analyze_repeatability_data(sourcedir, bilayerDict, setStartLoadToZero=False,
                                               k_sq=k_sq, m=m, p_lim=p_lim,
                                               loadFlag=True, hasMagnets=bool(unitData.magnets),
                                               **bilayerDict)
-        print(r"T = {0}C, $\theta_T$ = {1:.2f}, k = {2:.2e}".format(unitData.T, np.degrees(unitModel.total_angle), unitModel.hinge.k))
         
-        # Plot repeatability with magnets
+        # Plot raw force-displacement data
         fig = plt.figure('unitCell_repeatability_force_Y')        
         plt.plot(disp_plt, unitData.load, colors[iplt], label="experiment, {0}".format(TLabels[iplt]))
         plt.plot(disp_plt, unitModel.model_load_disp(unitData.disp), colors[iplt]+'--',

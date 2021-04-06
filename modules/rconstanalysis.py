@@ -21,7 +21,7 @@ ANGLE_NEAR_ZERO = 1e-8 # Since setting angle to exactly zero can give numerical 
 # =============================================================================
 # Main functions (to be called in script)
 # =============================================================================
-def import_rconst_data(sourcedir, bilayerDict={}, setStartLoadToZero=False, m=0):
+def import_rconst_data(sourcedir, bilayerDict={}, m=0, setStartLoadToZero=False):
     """ Check how repeatably we can manufacture and test unit cells with
         nominally identical hinge thickness ratio """
     
@@ -29,24 +29,6 @@ def import_rconst_data(sourcedir, bilayerDict={}, setStartLoadToZero=False, m=0)
                                             setStartLoadToZero=setStartLoadToZero,
                                             m=m, figFlag=False)
     h_vals = ucdf.h.unique()
-    #ucdf_Y = ucdf.loc[ucdf["magnets"] == 1] 
-    for h in h_vals:
-        experiment.plot_magnet_and_T_comparison(ucdf[ucdf["h"] == h], 
-                                                title=f'rconst, $h$ = {1e3*h} mm')
-    r_avg = ucdf["r"].mean()
-
-    return r_avg, ucdf
-
-
-def import_rconst_data(sourcedir, bilayerDict={}, setStartLoadToZero=False, m=0):
-    """ Check how repeatably we can manufacture and test unit cells with
-        nominally identical hinge thickness ratio """
-    
-    ucdf = experiment.import_all_unit_cells(sourcedir, bilayerDict=bilayerDict, 
-                                            setStartLoadToZero=setStartLoadToZero,
-                                            m=m, figFlag=False)
-    h_vals = ucdf.h.unique()
-    #ucdf_Y = ucdf.loc[ucdf["magnets"] == 1] 
     for h in h_vals:
         experiment.plot_magnet_and_T_comparison(ucdf[ucdf["h"] == h], 
                                                 title=f'rconst, $h$ = {1e3*h} mm')
@@ -118,9 +100,9 @@ def analyze_rconst_moment(ucdf, k_sq_fit, bilayerDict):
         maxIndex = np.where(unitData.strain > maxStrain)[0][0]
         nearZeroIndices = [i for i in nearZeroIndices if i < maxIndex]
         
-        plt.figure()
-        plt.plot(unitData.strain, unitData.load, 'k')
-        plt.plot(unitData.strain[nearZeroIndices], unitData.load[nearZeroIndices], 'ro', linewidth=0)
+        #plt.figure()
+        #plt.plot(unitData.strain, unitData.load, 'k')
+        #plt.plot(unitData.strain[nearZeroIndices], unitData.load[nearZeroIndices], 'ro', linewidth=0)
 
         p_given = [unitModel.total_angle, unitModel.k_eq, unitData.d/2]
         p_fit_moment_individual[count] = model.approximate_only_magnet(unitData.disp[:maxIndex],
@@ -259,7 +241,7 @@ def analyze_rconst_collision(ucdf, k_sq_fit, moment_fit, bilayerDict):
         (A, B) for exponential fit"""
     ucdf_Y = ucdf.loc[ucdf["magnets"] == 1]  
     
-    p_fit_all = fit_constant_collision(ucdf_Y, [k_sq_fit, 0, bilayerDict])
+    p_fit_all = fit_constant_collision(ucdf_Y, [k_sq_fit, moment_fit, bilayerDict])
     p_lim_fit = p_fit_all.x
     
     return p_lim_fit
@@ -281,9 +263,7 @@ def residual_constant_collision(p, ucdf, params_given, limFlag='exp'):
     """ Cost function: minimize difference between constant collision parameters
         and best-fit collision parameters, for all force-displacement relations """
 
-    k_sq_fit, m_fit, bilayerDict = params_given
-
-    print(f"running... p = {p}")    
+    k_sq_fit, m_fit, bilayerDict = params_given   
 
     # Find individual best-fit values for k_q
     nSamples = len(ucdf)
@@ -304,9 +284,9 @@ def residual_constant_collision(p, ucdf, params_given, limFlag='exp'):
         minStrain = 0.26
         minIndex = np.where(unitData.strain > minStrain)[0][0]
         
-        plt.figure()
-        plt.plot(unitData.strain, unitData.load, 'k')
-        plt.plot(unitData.strain[minIndex:], unitData.load[minIndex:], 'ro', linewidth=0)
+        #plt.figure()
+        #plt.plot(unitData.strain, unitData.load, 'k')
+        #plt.plot(unitData.strain[minIndex:], unitData.load[minIndex:], 'ro', linewidth=0)
         
         p_given = [unitModel.total_angle, unitModel.k_eq, unitData.d/2, m_fit]
         p_guess = p
@@ -392,9 +372,9 @@ def residual_constant_ksq_and_d(p, ucdf, params_given, limFlag='exp'):
         maxStrain = 0.15
         maxIndex = np.where(unitData.strain < maxStrain)[0][-1]
         
-        plt.figure()
-        plt.plot(unitData.strain, unitData.load, 'k')
-        plt.plot(unitData.strain[:maxIndex], unitData.load[:maxIndex], 'ro', linewidth=0)
+        #plt.figure()
+        #plt.plot(unitData.strain, unitData.load, 'k')
+        #plt.plot(unitData.strain[:maxIndex], unitData.load[:maxIndex], 'ro', linewidth=0)
         
         p_given = [unitModel.total_angle, unitModel.hinge.k, m_fit]
         p_guess = p

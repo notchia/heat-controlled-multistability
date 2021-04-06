@@ -207,9 +207,9 @@ def import_all_unit_cells(sourcedir, cropFlag=True, figFlag=False, setStartLoadT
             filepath = os.path.join(sourcedir, entry)
             ucd = UnitCellData(filepath, cropFlag=cropFlag, figFlag=figFlag,
                                setStartLoadToZero=setStartLoadToZero, m=m)
-            if any(bilayerDict) and (ucd.magnets == 0): # TODO: update based on modeled angle!
+            if any(bilayerDict) and (ucd.magnets == 0):
                 ucd.set_zero_with_angle(bilayerDict)
-            UCDF = UCDF.append(ucd.get_Series(),ignore_index=True)
+            UCDF = UCDF.append(ucd.get_Series(), ignore_index=True)
         count += 1
 
     # Update the load zero offset based on the modeled angle
@@ -224,16 +224,16 @@ def import_all_unit_cells(sourcedir, cropFlag=True, figFlag=False, setStartLoadT
             match_N = match_N.iloc[0]["data"]
             openIndex = np.where(match_N.strain > 0)[0][0]
             zeroOffset = row["data"].load[openIndex] - match_N.load[openIndex]
-            print(zeroOffset)
             row["data"].load = row["data"].load - zeroOffset
             if cropFlag:
                 row["data"].load_full = row["data"].load_full - zeroOffset
             else:
                 row["data"].load_crop = row["data"].load_crop - zeroOffset
 
-    # Sort and display to double check what was imported
+    # Sort and display what was imported
+    print("Imported the following force-displacement data:")
     UCDF.sort_values(["magnets","T_group","h","r"])
-    print(UCDF[["fileid"]])
+    print(UCDF[["magnets", "T_group", "h", "r"]])
     
     return UCDF
 
@@ -298,8 +298,9 @@ def compute_unitCell_mean_std(ucdf, nPoints=2500):
     return meanUnit
 
 
-def plot_magnet_and_T_comparison(ucdf, modellist=None, stdFlag=False, legendOut=False,
-                                 title=''):
+def plot_magnet_and_T_comparison(ucdf, modellist=None, stdFlag=False, 
+                                 legendOut=False, saveFlag=False, 
+                                 savedir='', title=''):
     """ Plot and compare data, grouping by magnets and temperature """
     
     plt.figure(dpi=200)
@@ -328,6 +329,10 @@ def plot_magnet_and_T_comparison(ucdf, modellist=None, stdFlag=False, legendOut=
         plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     else:
         plt.legend()
+    
+    if saveFlag:
+        plt.savefig(os.path.join(savedir,"{0}.png".format(title)), dpi=200)
+        plt.savefig(os.path.join(savedir,"{0}.svg".format(title)), transparent=True)   
     
     return
 

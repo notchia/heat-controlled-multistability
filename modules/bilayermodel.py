@@ -62,7 +62,6 @@ class BilayerModel:
         self._set_temperature_dependent_parameters()
         return
     
-    
     def _set_temperature_dependent_parameters(self):
         """ Set all temperature-dependent parameters """  
         self.E_PDMS = PDMS.model_elastic_modulus(self.T) # [Pa] traditional AML PDMS; default from 08/07/20
@@ -119,7 +118,7 @@ class BilayerModel:
             kappa = 0
         else:
             numer = LCE.model_strain(self.T, *(self.LCE_strain_params))
-            denom = ((2/self.h_total)*(self.E_LCE*self.I_LCE + self.E_PDMS*self.I_PDMS)
+            denom = ((2/self.h_total)*(self.E_LCE*self.I_LCE_NA + self.E_PDMS*self.I_PDMS_NA)
                      *(1/(self.E_LCE*self.h_LCE*self.w) + 1/(self.E_PDMS*self.h_PDMS*self.w))
                      + (self.h_total/2))
             kappa = numer/denom
@@ -167,7 +166,7 @@ def analyze_curvature_change_with_temp(LCE_modulus_params=[], LCE_strain_params=
                                        saveFlag=False, figdir='', verboseFlag=False):
     """ Generate 2D color plots of normalized angle (s = h) on h-T axes """
     
-    h_range = 1e-3*np.arange(0.5,2.5,0.5) #[m]
+    h_range = [1e-3] #[m]
     r_range = np.arange(0.01,1.0,0.01)
     T_range = np.arange(25,101,1)
     
@@ -191,10 +190,11 @@ def analyze_curvature_change_with_temp(LCE_modulus_params=[], LCE_strain_params=
                                    barLabel='Normalized curvature $h\kappa$',
                                    figLabel='thetaT',
                                    saveFlag=saveFlag, figdir=figdir)
-        colorplot_change_with_temp(h, h, r_range, T_range, kappaT_vals,
-                                   barLabel='Curvature $\kappa$ (1/m)',
-                                   figLabel='kappaT',
-                                   saveFlag=saveFlag, figdir=figdir)
+        if verboseFlag:
+            colorplot_change_with_temp(h, h, r_range, T_range, kappaT_vals,
+                                       barLabel='Curvature $\kappa$ (1/m)',
+                                       figLabel='kappaT',
+                                       saveFlag=saveFlag, figdir=figdir)
     
     return
 

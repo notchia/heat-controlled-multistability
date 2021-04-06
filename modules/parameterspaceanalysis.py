@@ -89,7 +89,7 @@ def run_composite_phase_boundary_analysis(r_val,
                        h_range=1e-3*np.arange(0.5,2.1,0.01),
                        thetaL_range=np.radians(np.arange(-15.0,15.1,0.1)),
                        T_range=np.arange(25.0,105.0,25.0),
-                       b=[], k_sq=0.0, m=0.1471, limFlag='exp', p_lim=[3e-22, 51],
+                       k_sq=0.0, m=0, limFlag='exp', p_lim=[],
                        bilayerDict={},
                        savedir='', datestr='', closeFlag=True):
     """ Full parameter space analysis for h-theta_L-T given r """
@@ -123,7 +123,7 @@ def run_composite_phase_boundary_analysis(r_val,
         print("\tRunning new parameter-space analysis...")
         minima, phases, thetaT, theta0 = analyze_composite_phases(
             r_val, h_range=h_range, thetaL_range=thetaL_range, T_range=T_range,
-            b=b, k_sq=k_sq, m=m, limFlag=limFlag, p_lim=p_lim,
+            k_sq=k_sq, m=m, limFlag=limFlag, p_lim=p_lim,
             bilayerDict=bilayerDict)
         for T in T_range:
             plot_isotherm(r_val, T, phases, theta0, h_range=h_range, thetaL_range=thetaL_range,
@@ -145,7 +145,7 @@ def run_main_parameter_phase_boundary_analysis(thetaL_val,
                        h_range=1e-3*np.arange(0.5,2.1,0.01),
                        r_range=np.radians(np.arange(0.0,1.0,0.01)),
                        T_range=np.arange(25.0,105.0,25.0),
-                       b=[], k_sq=0.0, m=0.1471, limFlag='exp', p_lim=[3e-22, 51],
+                       k_sq=0.0, m=0, limFlag='exp', p_lim=[],
                        bilayerDict={},
                        savedir='', datestr='', closeFlag=True):
     """ Full parameter space analysis for h-r-T given theta_L """
@@ -172,12 +172,13 @@ def run_main_parameter_phase_boundary_analysis(thetaL_val,
         print("\tLoaded parameters, minima, phases, theta_T, and theta_0")
     except IOError:
         export_parameters(parameter_file, 0.0, T_range, h_range, r_range) #UPDATE THIS FUNCTION
-        sampleModel = metamaterial.MetamaterialModel(1e-3, 0.25, 0.0, T=25.0, k_sq=k_sq, m=m, p_lim=p_lim, **bilayerDict)
+        sampleModel = metamaterial.MetamaterialModel(1e-3, 0.25, 0.0, T=25.0,
+                                                     k_sq=k_sq, m=m, p_lim=p_lim, **bilayerDict)
         np.save(metamaterial_file, sampleModel)
         print("\tRunning new parameter-space analysis...")
         minima, phases, thetaT, theta0 = analyze_main_parameter_composite_phases(
             thetaL=0.0, h_range=h_range, r_range=r_range, T_range=T_range,
-            b=b, k_sq=k_sq, m=m, limFlag=limFlag, p_lim=p_lim,
+            k_sq=k_sq, m=m, limFlag=limFlag, p_lim=p_lim,
             bilayerDict=bilayerDict)
         for T in T_range:
             plot_main_parameter_isotherm(thetaL_val, T, phases, theta0,
@@ -215,7 +216,8 @@ def analyze_h_T_relation(r, thetaL=0.0, h_range=1e-3*np.arange(0.5,2.1,0.001),
         sys.stdout.write("\rMapping parameter space: analyzing {0}/{1} h values at {2:0.1f} minutes".format(i_h + 1, n_h, (time.perf_counter()-t0)/60.0))
         sys.stdout.flush()
         h = h_range[i_h]
-        sample = metamaterial.MetamaterialModel(h, r, thetaL, T=25.0, k_sq=k_sq, m=m, p_lim=p_lim, **bilayerDict)
+        sample = metamaterial.MetamaterialModel(h, r, thetaL, T=25.0,
+                                                k_sq=k_sq, m=m, p_lim=p_lim, **bilayerDict)
         for i_T in range(n_T):
             sample.update_T(T_range[i_T])              
             
@@ -266,9 +268,10 @@ def analyze_diagonal_dependence(h_val, ratio_val, thetaL_val,
             i_a + 1, n_a, (time.perf_counter()-t0)/60.0))
         sys.stdout.flush()
         sample = metamaterial.MetamaterialModel(h_val, ratio_val, thetaL_val,
-                                   T=25.0, k_sq=k_sq, m=m, p_lim=p_lim,
+                                   T=25.0, k_sq=k_sq, m=m,
+                                   p_lim=p_lim, limFlag=limFlag,
                                    d=a_range[i_a],
-                                   **bilayerDict)
+                                   **bilayerDict, showWarnings=False)
         for i_T in range(n_T):
             sample.update_T(T_range[i_T])
             
@@ -318,6 +321,7 @@ def find_3D_phase_boundaries(r, h_range=1e-3*np.arange(0.5,2.1,0.01),
     # Find where changes in phase occur *along temperature axis*
     diffs = np.diff(phases)
     boundaries = np.argwhere(diffs != 0)
+    print(boundaries.shape)
     N = max(boundaries.shape) # Number of points found located at boundary
     boundaryVals = np.zeros(N)
     for pt in range(N):
