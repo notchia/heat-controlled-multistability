@@ -1,2 +1,5 @@
-modules/__pycache__/
-*.pyc
+*/__pycache__/
+data/
+documentation/
+results/
+tmp/

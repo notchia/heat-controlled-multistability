@@ -1,12 +1,9 @@
-# -*- coding: utf-8 -*-
 """
-Created on Mon Aug 31 11:21:31 2020
+Define UnitCellData class and associated functions for manipulating quasistatic 
+unit cell data, as collected using the AML's material tester, for one-shot 
+loading in tension.
 
-@author: Lucia
-
-UnitCellData class and associated functions for manipulating quasistatic unit 
-cell data, as collected using the AML's material tester, for one-shot loading
-in tension.
+@author: Lucia Korpas
 """
 
 import numpy as np
@@ -23,10 +20,10 @@ from modules import unitforcemodel as model
 
 
 class UnitCellData:
-    ''' Store and manipulate data for each materials-tester data file imported'''
+    """ Store and manipulate data for each materials-tester data file imported"""
     def __init__(self, csvpath, cropFlag=True, figFlag=False, initEmpty=False,
                  setStartLoadToZero=False, setZeroLoadFromAngle=False, m=0):
-        ''' Set metadata based on filename and import load-displacement data  '''
+        """ Set metadata based on filename and import load-displacement data  """
 
         # Set parameter information -------------------------------------------
         csvname = os.path.splitext(os.path.split(csvpath)[-1])[0]
@@ -51,7 +48,7 @@ class UnitCellData:
             sampleLoad = self._get_re_value(csvname,'_(\d*\.\d+)N',0.0)           # [N] sample mass
             self.disp, self.load  = self._import_data(csvpath, speed=speed, zeroDisp=zeroDisp,
                                                       sampleLoad=sampleLoad, figFlag=figFlag)
-        
+
             # Crop to analyzable portion of data (compression)
             if cropFlag:
                 self.disp_full, self.load_full = self.disp, self.load
@@ -72,7 +69,7 @@ class UnitCellData:
         # and load mean and standard deviation
 
     def get_Series(self):
-        ''' Create a pandas Series to be compiled into the DataFrame for all of the data '''
+        """ Create a pandas Series for one sample test """
         return pd.Series({"data":    self,
                           "fileid":  self.fileid,
                           "h":       self.h,
@@ -83,9 +80,11 @@ class UnitCellData:
                           "magnets": self.magnets})
 
     def set_zero_with_angle(self, bilayerDict):
+        """ Rezero the force-displacement curves based on the nominal
+            right-angle position """
         hinge = bilayer.BilayerModel(self.h, self.r, T=self.T, **bilayerDict)
         nominalZero = model.rot2disp(hinge.thetaT, self.d/2)
-        zeroIndex = np.where(self.disp < nominalZero)[0][0] # CHECK THIS
+        zeroIndex = np.where(self.disp < nominalZero)[0][0] # TODO: CHECK THIS
         self.zeroOffset = self.load[zeroIndex]
         self.load = self.load - self.zeroOffset
         if self.cropFlag:
@@ -93,14 +92,26 @@ class UnitCellData:
         else:
             self.load_crop = self.load_crop - self.zeroOffset
         return
+    
+    def reset_d(self, d):
+        self.d = d
+        if self.cropFlag:
+            #self.disp_full, self.load_full = self.disp_orig, self.load
+            self.strain_full = (self.d - self.disp_full)/self.d
+            self.disp, self.load = self._crop_to_compressed()
+            self.strain = (self.d - self.disp)/self.d
+        else:
+            self.strain = (self.d - self.disp)/self.d
+            self.disp_crop, self.load_crop = self._crop_to_compressed()
+            self.strain_crop = (self.d - self.crop)/self.d        
 
     def _import_data(self, filepath, speed=0.2, zeroDisp=0.0, sampleLoad=0.0,
                      figFlag=False): 
-        ''' Import one-shot test in tension. 
+        """ Import one-shot test in tension. 
             - speed:          [mm/s] test speed
             - zeroDisp:       [mm] initial distance between centers of squares
             - sampleLoad:     [N] sample mass
-            - tempLoadOffset: [N] load offset due to shift in load zero as a result of temperature'''
+            - tempLoadOffset: [N] load offset due to shift in load zero as a result of temperature"""
        
         # Import test ---------------------------------------------------------
         cols = [0,1] #time, load
@@ -144,14 +155,16 @@ class UnitCellData:
         return disp, load
  
     def _crop_to_compressed(self):
+        """ Crop out the portion where the angle-displacement relation breaks
+            down """
         self.zeroIndex = np.argwhere(self.disp <= self.d)[0][0]
         return self.disp[self.zeroIndex:], self.load[self.zeroIndex:]
     
     def _get_re_value(self, strname, pattern, defaultval):
-        ''' Ternary operator for assigning values using regular expressions.
+        """ Ternary operator for assigning values using regular expressions.
             - Returns numbers as floats
             - Returns Y/N as 0/1
-            - Otherwise, returns string'''
+            - Otherwise, returns string"""
         patternmatch = re.search(pattern,strname)
         if patternmatch:
             returnval = patternmatch.group(1)
@@ -169,7 +182,7 @@ class UnitCellData:
             return defaultval    
     
     def _get_temperature_group(self):
-        ''' 0, 1, 2 for room temperature, medium (~45C), and high (~75C) '''
+        """ 0, 1, 2 for room temperature, medium (~45C), and high (~75C) """
         if self.T < 30:
             group = 0
         elif self.T < 60:
@@ -182,7 +195,7 @@ class UnitCellData:
 #%% Utilities for importing and analyzing multiple datasets
 def import_all_unit_cells(sourcedir, cropFlag=True, figFlag=False, setStartLoadToZero=False,
                           bilayerDict={}, m=0):
-    ''' Import all unit cell data from a directory into a DataFrame '''
+    """ Import all unit cell data from a directory into a DataFrame """
     
     UCDF = pd.DataFrame()  
     count = 0
@@ -194,12 +207,12 @@ def import_all_unit_cells(sourcedir, cropFlag=True, figFlag=False, setStartLoadT
             filepath = os.path.join(sourcedir, entry)
             ucd = UnitCellData(filepath, cropFlag=cropFlag, figFlag=figFlag,
                                setStartLoadToZero=setStartLoadToZero, m=m)
-            if any(bilayerDict) and (ucd.magnets == 0): # update based on modeled angle!
+            if any(bilayerDict) and (ucd.magnets == 0):
                 ucd.set_zero_with_angle(bilayerDict)
-            UCDF = UCDF.append(ucd.get_Series(),ignore_index=True)
+            UCDF = UCDF.append(ucd.get_Series(), ignore_index=True)
         count += 1
 
-    # Update the load zero offset based on the modeled angle.
+    # Update the load zero offset based on the modeled angle
     if any(bilayerDict):
         ucdf_Y = UCDF.loc[UCDF["magnets"] == 1]
         for index, row in ucdf_Y.iterrows():
@@ -211,23 +224,24 @@ def import_all_unit_cells(sourcedir, cropFlag=True, figFlag=False, setStartLoadT
             match_N = match_N.iloc[0]["data"]
             openIndex = np.where(match_N.strain > 0)[0][0]
             zeroOffset = row["data"].load[openIndex] - match_N.load[openIndex]
-            print(zeroOffset)
             row["data"].load = row["data"].load - zeroOffset
             if cropFlag:
                 row["data"].load_full = row["data"].load_full - zeroOffset
             else:
                 row["data"].load_crop = row["data"].load_crop - zeroOffset
 
-    # Sort and display to double check what was imported
+    # Sort and display what was imported
+    print("Imported the following force-displacement data:")
     UCDF.sort_values(["magnets","T_group","h","r"])
-    print(UCDF[["fileid"]])
+    print(UCDF[["magnets", "T_group", "h", "r"]])
     
     return UCDF
 
+
 def compute_unitCell_mean_std(ucdf, nPoints=2500):
-    ''' Given dataframe containing only the data to be averaged, return
+    """ Given dataframe containing only the data to be averaged, return
         UnitCellData object corresponding to mean and standard deviation
-        '''
+        """
     
     nTests = len(ucdf.index)
     load_all = np.zeros((nPoints, nTests))
@@ -283,60 +297,44 @@ def compute_unitCell_mean_std(ucdf, nPoints=2500):
     
     return meanUnit
 
-def plot_magnet_and_T_comparison(ucdf, stdFlag=False, legendOut=False):
-    ''' Plot and compare data, grouping by magnets and temperature '''
+
+def plot_magnet_and_T_comparison(ucdf, modellist=None, stdFlag=False, 
+                                 legendOut=False, saveFlag=False, 
+                                 savedir='', title=''):
+    """ Plot and compare data, grouping by magnets and temperature """
     
     plt.figure(dpi=200)
     plt.xlabel("Strain, $\delta/d$")
     plt.ylabel("Load (N)")
+    if title != '':
+        plt.title(title)
     colors = ['r','g','b']
     styles = ['-','--']
     TLabels = ['RT', 'T~45$^\circ$', 'T~75$^\circ$']
     magnetLabels = ['no', 'with']
+    
     for index, row in ucdf.iterrows():
         unit = row["data"]
         T_index = int(unit.T_group)
         m_index = int(unit.magnets)
-        disp_plt = unit.strain#((unit.d - unit.disp)/unit.d)
+        disp_plt = unit.strain
         plt.plot(disp_plt, unit.load, color=colors[T_index], linestyle=styles[m_index],
                  label='{0}, {1} magnets'.format(TLabels[T_index], magnetLabels[m_index]))
         if stdFlag:
             plt.fill_between(disp_plt, unit.load-unit.std, unit.load+unit.std, color=colors[T_index], alpha=0.2)
+        if modellist:
+            plt.plot(disp_plt[:-550], modellist[index][:-550], '--', color=colors[T_index], label="model")
+    
     if legendOut:
         plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     else:
         plt.legend()
     
-    return
-
-
-def plot_no_magnet_model_T_comparison(ucdf, modellist, stdFlag=False, legendOut=False):
-    ''' Plot and compare data, grouping by magnets and temperature for final fig. 4'''
-    
-    plt.figure(dpi=200)
-    plt.xlabel("Strain, $\delta/d$")
-    plt.ylabel("Load (N)")
-    colors = ['r','g','b']
-    styles = ['-','--']
-    TLabels = ['RT', 'T~45$^\circ$', 'T~75$^\circ$']
-    magnetLabels = ['no', 'with']
-    for index, row in ucdf.iterrows():
-        unit = row["data"]
-        T_index = int(unit.T_group)
-        m_index = int(unit.magnets)
-        disp_plt = unit.strain#
-        plt.plot(disp_plt, unit.load, color=colors[T_index], linestyle=styles[m_index],
-                 label='{0}, {1} magnets'.format(TLabels[T_index], magnetLabels[m_index]))
-        if stdFlag:
-            plt.fill_between(disp_plt, unit.load-unit.std, unit.load+unit.std, color=colors[T_index], alpha=0.2)
-        plt.plot(disp_plt[:-550], modellist[index][:-550], '--', color=colors[T_index], label="model")
-    if legendOut:
-        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-    else:
-        plt.legend()
+    if saveFlag:
+        plt.savefig(os.path.join(savedir,"{0}.png".format(title)), dpi=200)
+        plt.savefig(os.path.join(savedir,"{0}.svg".format(title)), transparent=True)   
     
     return
-
 
     
 #%% Main importing function
