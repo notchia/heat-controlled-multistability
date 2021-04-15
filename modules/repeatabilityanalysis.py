@@ -107,6 +107,8 @@ def analyze_repeatability_data(sourcedir, bilayerDict, setStartLoadToZero=False,
                                               loadFlag=True, hasMagnets=bool(unitData.magnets),
                                               **bilayerDict)
         
+        print(f"For (h, r, T) = ({1e3*unitData.h}, {unitData.r}, {unitData.T}), k = {unitModel.hinge.k} Nm for model shown in figure")
+        
         # Plot raw force-displacement data
         fig = plt.figure('unitCell_repeatability_force_Y')        
         plt.plot(disp_plt, unitData.load, colors[iplt], label="experiment, {0}".format(TLabels[iplt]))

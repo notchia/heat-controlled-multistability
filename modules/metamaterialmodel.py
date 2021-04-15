@@ -398,11 +398,11 @@ def plot_energy_concept(h_total, ratio, thetaL, T_range,
                                k_sq=k_sq, m=m, limFlag=limFlag, p_lim=p_lim,
                                **bilayerDict)
     
-    plt.figure(figsize=(5, 8), dpi=200)
+    plt.figure(figsize=(6, 4), dpi=200)
     plt.title(r"$h$={0}mm, $r$={1}, $\theta_L$={2:0.1f}$^\circ$".format(
         h_total, ratio, np.degrees(thetaL)))
     plt.xlabel(r"Angle $\theta$ (degrees)")
-    plt.ylabel("Energy (J)")   
+    plt.ylabel("Energy (mJ)")   
     
     q_range = np.radians(np.arange(-50.0,50.5,0.5))
     q_deg = np.degrees(q_range)
@@ -411,16 +411,15 @@ def plot_energy_concept(h_total, ratio, thetaL, T_range,
         sample.update_T(T)
         U_total = sample._calculate_total_energy(q_range)
         U_spring = sample._model_U_spring(q_range)
-        plt.plot(q_deg, U_total, '-', color=colors[i], label=f'Total, T={T}')
-        plt.plot(q_deg, U_spring, '--', color=colors[i], label=f'Spring, T={T}')
+        plt.plot(q_deg, 1e3*U_total, '-', color=colors[i], label=f'Total, T={T}')
         minima = signal.argrelmin(U_total)[0]
         maxima = signal.argrelmax(U_total)[0]
         minU = U_total[minima]
         maxU = U_total[maxima]
-        plt.plot(q_deg[minima], minU, 'v', color=colors[i])
-        plt.plot(q_deg[maxima], maxU, '^', color=colors[i])
+        plt.plot(q_deg[minima], 1e3*minU, 'v', color=colors[i])
+        plt.plot(q_deg[maxima], 1e3*maxU, '^', color=colors[i])
    
-    plt.ylim(-0.0015,0.002)
+    plt.ylim(-2.0,0.0)
     plt.legend()
     
     plt.savefig(os.path.join(figdir,'{0}.png'.format('energy_concept')))

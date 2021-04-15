@@ -12,39 +12,13 @@ import scipy.optimize as opt
 import modules.bilayermodel as bl
 
 
-def fit_arclength_s(bilayer, T_vals, dtheta_avg):
-    """ Least-squares optimization of arc length """
-   
-    s_guess = bilayer.s
-    s_fit = opt.least_squares(residual_bilayer_s, s_guess,
-                              args=(dtheta_avg, T_vals, bilayer))
-    return s_fit.x
 
-
-def residual_bilayer_s(s, angle_exp, T_vals, bilayer):
-    """ Residual to minize for fit_arclength_s """
-    
-    # Update bilayer model with current guess for best-fit arc length
-    bilayer.s = s
-    bilayer.update_temperature(24.3)
-    thetaRT = bilayer.thetaT
-    
-    # Calcualte updated bilayer model values for change in angle
-    angle_model = np.zeros_like(T_vals)
-    for i, T in enumerate(T_vals):
-        bilayer.update_temperature(T)
-        angle_model[i] = bilayer.thetaT - thetaRT
-        
-    residual = angle_exp - angle_model
-    return residual
-
-
-def quadratic_pure(x, b):
-    return b*x**2
-
-
+# =============================================================================
+# Main function (to call from data_analysis_script)
+# =============================================================================
 def analyze_bending_angles(datapath, parampath, nSamples=3,
                            LCE_modulus_params=[], LCE_strain_params=[],
+                           r_relation=[1,0],
                            saveFlag=False, figdir='', titlestr=''):
     """ Analyze ImageJ unit cell change-in-bending-angle data (three samples,
         two temperature setpoints above RT) 
@@ -77,7 +51,7 @@ def analyze_bending_angles(datapath, parampath, nSamples=3,
         # For each sample, calculate best-fit s
         dtheta_rad = np.radians(dtheta_avg[i,:])
         h_val = h_avg[i]
-        r_val = r_avg[i]
+        r_val = np.polyval(r_relation, r_avg[i])
         s_val = s_avg[i]
         bilayer = bl.BilayerModel(h_val*1e-3, r_val, s=s_val*1e-3, T=24.3,
                                   LCE_modulus_params=LCE_modulus_params,
@@ -112,12 +86,14 @@ def analyze_bending_angles(datapath, parampath, nSamples=3,
         plt.savefig(os.path.join(figdir, "{0}.png".format(filename)), dpi=200)
         plt.savefig(os.path.join(figdir, "{0}.svg".format(filename)))   
     
-    # Find resulting modeled change in angle over temperature ------------------
+    # =========================================================================
+    # Find resulting modeled change in angle over temperature
+    # =========================================================================
     dtheta_model_update = np.zeros((3,len(T_range)))
     if 'h' not in titlestr:
         for i in range(3):
             h_val = h_avg[i]
-            r_val = r_avg[i]
+            r_val = np.polyval(r_relation, r_avg[i])
             s_val = s_avg[i]
             bilayer = bl.BilayerModel(h_val*1e-3, r_val, T=24.3,
                                       b=b_fit, bFlag='quad', 
@@ -153,3 +129,36 @@ def analyze_bending_angles(datapath, parampath, nSamples=3,
         return None
     else:
         return b_fit
+    
+# =============================================================================
+# Other functions (internal)
+# ============================================================================
+def fit_arclength_s(bilayer, T_vals, dtheta_avg):
+    """ Least-squares optimization of arc length """
+   
+    s_guess = bilayer.s
+    s_fit = opt.least_squares(residual_bilayer_s, s_guess,
+                              args=(dtheta_avg, T_vals, bilayer))
+    return s_fit.x
+
+
+def residual_bilayer_s(s, angle_exp, T_vals, bilayer):
+    """ Residual to minize for fit_arclength_s """
+    
+    # Update bilayer model with current guess for best-fit arc length
+    bilayer.s = s
+    bilayer.update_temperature(24.3)
+    thetaRT = bilayer.thetaT
+    
+    # Calcualte updated bilayer model values for change in angle
+    angle_model = np.zeros_like(T_vals)
+    for i, T in enumerate(T_vals):
+        bilayer.update_temperature(T)
+        angle_model[i] = bilayer.thetaT - thetaRT
+        
+    residual = angle_exp - angle_model
+    return residual
+
+
+def quadratic_pure(x, b):
+    return b*x**2

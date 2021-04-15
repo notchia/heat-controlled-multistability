@@ -118,7 +118,7 @@ class BilayerModel:
             kappa = 0
         else:
             numer = LCE.model_strain(self.T, *(self.LCE_strain_params))
-            denom = ((2/self.h_total)*(self.E_LCE*self.I_LCE_NA + self.E_PDMS*self.I_PDMS_NA)
+            denom = ((2/self.h_total)*(self.E_LCE*self.I_LCE + self.E_PDMS*self.I_PDMS)
                      *(1/(self.E_LCE*self.h_LCE*self.w) + 1/(self.E_PDMS*self.h_PDMS*self.w))
                      + (self.h_total/2))
             kappa = numer/denom

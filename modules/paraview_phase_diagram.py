@@ -292,8 +292,10 @@ def render_isotherms(fnameList2, yscale=2):
 if __name__ == "__main__":
     basepath = 'C:/Users/lucia/Documents/Research/heat-controlled_multistability/results/'
 
+
+    # Only one of the following two blocks should be uncommented at a time
     '''
-    datestr = '20201027'#20201214
+    datestr = '20210412'
 
     boundaryValues = [0,1,2,3,6]
     fnameList = []
@@ -308,16 +310,16 @@ if __name__ == "__main__":
     render_isotherms(fnameList2)
     render_boundaries(fnameList)
 
-    #pv.WriteImage("test.png")
     pv.Interact()
     pv.SaveScreenshot(os.path.join(basepath,'paraview.png'),pv.GetActiveView(),
                       TransparentBackground=1)
     '''
 
-    datestr = '20201028'#'20201019' #'20200422' #
-
-    #values = [0,1,2,3,5,6]
-    boundaryValues = [0,1,3]
+    datestr = '20210412'
+    
+    # NOTE: To get this one to render correctly, had to delete all points at 
+    # h=0.5 (the first h value) in boundary 1 and restructure VTK file accordingly.
+    boundaryValues = [0,1]#,3]
     fnameList = []
     for value in boundaryValues:
         fname = os.path.join(basepath, '{0}_boundaryDataMain_{1}.vtk'.format(datestr, value))
@@ -330,10 +332,8 @@ if __name__ == "__main__":
     render_isotherms(fnameList2, yscale=65)
     render_boundaries(fnameList, yscale=65)
 
-    #pv.WriteImage("test.png")
     pv.Interact()
     pv.SaveScreenshot(os.path.join(basepath,'paraview.png'),pv.GetActiveView(),
                       TransparentBackground=1)
-    
     
     

@@ -83,7 +83,7 @@ if __name__ == "__main__":
     datafile = os.path.join(sourcedir, "200819_bilayer_ImageJ_curvature.csv")
     paramfile = os.path.join(sourcedir, "200819_bilayer_parameters.csv")
     
-    rBestFit=True
+    rBestFit=False
     r_relation = curvature.analyze_bending_data(paramfile, datafile, rBestFit=rBestFit,
                                                 LCE_modulus_params=modulusParams,
                                                 LCE_strain_params=strainParams, 
@@ -94,7 +94,7 @@ if __name__ == "__main__":
                                              saveFlag=SAVE_FLAG, figdir=savedir,
                                              verboseFlag=VERBOSE_FLAG)
 
-    #%% Run analysis on unit cell bending angles, without 
+    #%% Run analysis on unit cell bending angles, without magnets
     section_header('unit cell angles')
     sourcedir = os.path.join(rawdir, "unitCell_properties")
     
@@ -104,6 +104,7 @@ if __name__ == "__main__":
     b_fit = angle.analyze_bending_angles(datafile, paramfile,
                            LCE_modulus_params=modulusParams,
                            LCE_strain_params=strainParams, titlestr='fixed r',
+                           r_relation=r_relation,
                            saveFlag=SAVE_FLAG, figdir=savedir)
     print("arc length is now defined as s = b_fit[0]h^2, with b_fit = {0}".format(b_fit))
 
@@ -118,11 +119,12 @@ if __name__ == "__main__":
     sourcedir = os.path.join(rawdir,"unitCell_properties/unitCell_tension_rconst")
     
     r_avg, ucdf = force.import_rconst_data(sourcedir, bilayerDict, m=moment) #setStartLoadToZero=True
+
     
     #%% Find best-fit square stiffness for r-const data
     item_header("Finding best-fit k_sq")
     
-    ksq_fit = force.analyze_rconst_ksq(ucdf, bilayerDict) #or, analyze_rconst_nomagnets
+    ksq_fit = force.analyze_rconst_ksq(ucdf, bilayerDict, r_relation=r_relation) #or, analyze_rconst_nomagnets
     print("k_sq_fit: {0}".format(ksq_fit))
 
     #%% Find best-fit magnetic moment and collision parameters for r-const data
@@ -167,7 +169,7 @@ if __name__ == "__main__":
     '''
         
     #%% Additional analysis: generate Fig. 1 energy concept plot
-    h_val = 0.9e-3
+    h_val = 1.0e-3
     r_val = 0.25
     T_range = [25.0, 35.0, 50.0, 80.0]
     unit.plot_energy_concept(h_val, r_val, 0.0, T_range,
@@ -191,8 +193,8 @@ if __name__ == "__main__":
 
     h_range = 1e-3*np.arange(0.5,2.005,0.01)
 
-    #T_range = np.arange(25.0,78.5,0.5) # CURRENTLY IN MANUSCRIPT
-    T_range = np.array([25.0, 45.0, 78.0])
+    T_range = np.arange(25.0,78.5,0.5) # CURRENTLY IN MANUSCRIPT
+    #T_range = np.array([25.0, 45.0, 78.0])
     T_isotherm = [25.0, 45.0, 78.0]
     i_isotherm = [np.argwhere(T_range == T_val)[0][0] for T_val in T_isotherm]
     
@@ -208,7 +210,7 @@ if __name__ == "__main__":
     thetaL_val = 0.0
 
     #datestr = '' # Use this to redo the analysis
-    datestr = '20210405'
+    datestr = '20210412'
     
     item_header("h-r-T (\"main\") parameter space analysis")
     minimaMain, phasesMain, thetaTMain, theta0Main, paramDictMain, sampleModelMain = mapping.run_main_parameter_phase_boundary_analysis(thetaL_val,
