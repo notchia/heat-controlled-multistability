@@ -193,8 +193,7 @@ if __name__ == "__main__":
 
     h_range = 1e-3*np.arange(0.5,2.005,0.01)
 
-    T_range = np.arange(25.0,78.5,0.5) # CURRENTLY IN MANUSCRIPT
-    #T_range = np.array([25.0, 45.0, 78.0])
+    T_range = np.arange(25.0,78.5,0.5) 
     T_isotherm = [25.0, 45.0, 78.0]
     i_isotherm = [np.argwhere(T_range == T_val)[0][0] for T_val in T_isotherm]
     
@@ -238,5 +237,4 @@ if __name__ == "__main__":
                             minima=minima, phases=phases, angleT_vals=thetaT, angle0_vals=theta0)
     
     mapping.save_boundaries(datestr, resdir, boundaries, boundaryData, boundaryVals)
-    mapping.save_isotherms(datestr, resdir, phases, i_isotherm, h_range, thetaL_range, T_range)
-    
+    mapping.save_isotherms(datestr, resdir, phases, i_isotherm, h_range, thetaL_range, T_range)  
