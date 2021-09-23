@@ -6,3 +6,5 @@ This project defines and characterizes a model of a mechanical metamaterial base
 After creating and activating the Python environment (in the command line: `conda env create --file environment.yml`, then `conda activate hcm`), the analysis script in the root directory can be run (`python data_analysis_script.py`) to regenerate nearly all of the analysis and related figures - but be warned that it takes several hours to run, almost entirely due to the parameter space mapping.
 
 [1] Korpas, Lucia M., et al. "Temperature-Responsive Multistable Metamaterials." ACS Applied Materials & Interfaces 13.26 (2021): 31163-31170.
+
+PDFs available: [paper](./paper/paper.pdf), [supplementary information](./paper/supplementary_information.pdf)
