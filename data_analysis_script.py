@@ -40,10 +40,15 @@ if __name__ == "__main__":
     if split[1] == 'modules':
         cwd = split[0]
     rawdir = os.path.join(cwd,"data/raw")
-    cleandir = os.path.join(cwd,"data/cleaned")
     tmpdir = os.path.join(cwd,"tmp")
     savedir = os.path.join(cwd,"results/figures_from_script")
     resdir = os.path.join(cwd,"results")
+    if not os.path.isdir(tmpdir):
+        os.mkdir(tmpdir)
+    if not os.path.isdir(resdir):
+        os.mkdir(resdir)
+    if not os.path.isdir(savedir):
+        os.mkdir(savedir)	
 
     #%% Get PDMS modulus 
     section_header('PDMS')
@@ -156,17 +161,6 @@ if __name__ == "__main__":
                                  p_lim=p_lim_fit, limFlag=limFlag,
                                  bilayerDict=bilayerDict,
                                  saveFlag=SAVE_FLAG, figdir=savedir)
-    
-    #%% Additional analysis: generate 2D phase diagram: dependence on diagonal
-    '''
-    h_val = 1.2e-3
-    ratio_val = 0.4
-    thetaL_val = 0.0
-    mapping.analyze_diagonal_dependence(h_val, ratio_val, thetaL_val,
-                                k_sq=ksq_fit, m=moment_fit, limFlag='exp', p_lim=p_lim_fit,
-                                bilayerDict=bilayerDict,
-                                saveFlag=SAVE_FLAG, figdir=savedir)
-    '''
         
     #%% Additional analysis: generate Fig. 1 energy concept plot
     h_val = 1.0e-3
@@ -208,8 +202,9 @@ if __name__ == "__main__":
     thetaL_range = np.radians(np.arange(-15.0,15.05,0.1))
     thetaL_val = 0.0
 
-    #datestr = '' # Use this to redo the analysis
-    datestr = '20210412'
+	# To rerun the analysis, use an empty string: this will generate a dataset labeled with the current date, e.g., '20210412' for April 12, 2021
+	# To use previous results or create new results with a custom label, supply the date string ('20210412') or custom label
+    datestr = '' 
     
     item_header("h-r-T (\"main\") parameter space analysis")
     minimaMain, phasesMain, thetaTMain, theta0Main, paramDictMain, sampleModelMain = mapping.run_main_parameter_phase_boundary_analysis(thetaL_val,
