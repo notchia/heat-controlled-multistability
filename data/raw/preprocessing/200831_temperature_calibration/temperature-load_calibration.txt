@@ -1,0 +1,31 @@
+Temperature calibration test: grip only, with door closed
+Temperature, Load, Time
++/1 0.2C, +/0.02N
+23.6C, 0.00N, 0min
+Low fan, lowest setting
+39.3C, 0.31N, 2min
+42.3C, 0.46N, 4min
+44.7C, 0.62N, 8min
+47.1C, 0.76N, 15min
+47.8C, 0.78N, 20min
+High fan, lowest setting
+73.0C, 1.18N, 2min
+77.0C, 1.39N, 4min
+79.0C, 1.56N, 8min
+79.7C, 1.72N, 15min
+81.7C, 1.75N, 20min
+Right around this time, the heat gun started sounding a little different, and the load started fluctuating more, dipping back down to 1.4N, as the temperature reading slowly went down about 0.5 degrees.  Little hard to tell though because the monitor timed out. Not sure what that's about... Makes me think the heat gun shouldn't be used at any given setting for more than like 15 minutes.
+Make sure to close and reopen Arduino serial monitor every 20 minutes or so!
+Cooldown: turn off heat gun (blows cold air for a while) and open door
+41.2C, 0.75N, 2min
+33.1C, 0.43N, 4min
+29.6C, 0.27N, 8min
+27.5C, 0.17N, 15min
+26.6C, 0.13N, 20min
+25.4C, 0.09N, 30min
+24.6C, 0.05N, 40min
+
+THERMAL EXPANSION CHECK:
+By feel, move unit cell displacement to lowest possible force at RT (25.5C), (load -0.08N). Then, heat directly to high fan, lowest setting for 20 minutes
+Took photos (1) at high temperature, at lowest-friction position, (2) at low temperature, same position as before, and (3) at low temperature, new lowest-friction position (this last one including a ruler).
+
