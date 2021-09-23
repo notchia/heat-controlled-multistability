@@ -1,0 +1,10 @@
+Cooldown: turn off heat gun (blows cold air for a while) and open door
+Temperature,Load,Time
+degrees C,N,min
+41.2,0.75,2
+33.1,0.43,4
+29.6,0.27,8
+27.5,0.17,15
+26.6,0.13,20
+25.4,0.09,30
+24.6,0.05,40
